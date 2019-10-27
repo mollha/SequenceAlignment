@@ -1,4 +1,6 @@
 
+
+
 def smith_waterman(unique_letters: str, scoring_matrix: list, seq1: str, seq2: str):
     """
     Applies the smith waterman algorithm to produce an alignment of two sequences
