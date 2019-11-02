@@ -7,93 +7,64 @@ def smith_waterman(unique_letters: str, scoring_matrix: list, seq_s: str, seq_t:
     :param seq2: sequence 2
     :return:
     """
-    # PRINT SCORING MATRIX
-    # Scoring matrix is used to retrieve the static scores for matching certain elements
-    my_row = [' '] + [a for a in unique_letters] + ['-']
-    print(my_row)
-    for index, line in enumerate(scoring_matrix):
-        line = [str(x) for x in line]
-        char = unique_letters[index]
-        line = [char] + line
-        print(line)
-
-    unique_dict = {char:index for (index, char) in enumerate(unique_letters)}
-    unique_dict['-'] = len(unique_letters)
-    print(unique_dict)
-
-    # ---- FILL MATRIX
-    m = len(seq_s)
-    n = len(seq_t)
-    # values_matrix = []
-    # values_matrix.append([] * n)
-    # for i in range(len(seq_s) - 1):
-    #     values_matrix.append([])
-
-    values_matrix = []
-    for i in range(m + 1):
-        values_matrix.append([])
-        for j in range(n + 1):
-            print('i = ' + str(i) + ' and j = ' + str(j))
-            if not i and not j:
-                values_matrix[i].append(0)
-
-            index_s = unique_dict[seq_s[i]]
-            index_t = unique_dict[seq_t[j]]
-            print('Score of matching ' + seq_s[i] + ' with ' + seq_t[j] + ': ', scoring_matrix[index_s][index_t])
-
-            #
-            #
-            # if not j:
-            #     max(0, values_matrix[][])
-
-
-    values_matrix = []  # Create values matrix
-    values_matrix.append([0] * len(seq_t))
-    for i in range(len(seq_s) - 1):
-        values_matrix.append([0])
-
-    for row in values_matrix:
-        print(row)
+    indel = len(unique_letters)
     unique_letters += '-'
+    print('Unique Letters', unique_letters)
+    print([x for x in unique_letters])
+    for index, row in enumerate(scoring_matrix):
+        print(row)
+    print('Sequence S:', seq_s)
+    print('Sequence T:', seq_t)
 
-    # PRINT SCORING MATRIX
-    # Scoring matrix is used to retrieve the static scores for matching certain elements
+    values = []
+    for i in range(0, len(seq_s)+1):
+        values.append([])
+        for j in range(0, len(seq_t)+1):
+            index_s = unique_letters.index(seq_s[i - 1])
+            index_t = unique_letters.index(seq_t[j - 1])
 
-smith_waterman('abc', [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], 'ab', 'bc')
+            if not i and not j:
+                val = 0
+                print('corner')
+            elif not i:
+                val = max(0, values[i][j-1] + scoring_matrix[indel][index_t])
+                if val == values[i][j-1] + scoring_matrix[indel][index_t]:
+                    print('left')
+                else:
+                    print('restart')
+            elif not j:
+                val = max(0, values[i-1][j] + scoring_matrix[index_s][indel])
+                if val == values[i-1][j] + scoring_matrix[index_s][indel]:
+                    print('up')
+                else:
+                    print('restart')
+            else:
+                val = max(0,
+                          values[i-1][j-1] + scoring_matrix[index_s][index_t],
+                          values[i-1][j] + scoring_matrix[index_s][indel],
+                          values[i][j-1] + scoring_matrix[indel][index_t])
+                if val == values[i-1][j-1] + scoring_matrix[index_s][index_t]:
+                    print('diag')
+                elif val == values[i-1][j] + scoring_matrix[index_s][indel]:
+                    print('up')
+                elif val == values[i][j-1] + scoring_matrix[indel][index_t]:
+                    print('left')
+                elif val == 0:
+                    print('restart')
+
+            values[i].append(val)
+            for row in values:
+                print(row)
+            print('-----------------')
 
 
-def index_scoring(letter_s, letter_t):
-    scoring_matrix = [[1, -1, -2, -1], [-1, 2, -4, -1], [-2, -4, 3, -2], [-1, -1, -2, 0]]
-    unique_letters = 'abc'
-    index_s = None
-    index_t = None
-    if letter_s == '-':
-        index_s = len(unique_letters)
-    else:
-        index_s = unique_letters.index(letter_s)
-    if letter_t == '-':
-        index_t = len(unique_letters)
-    else:
-        index_t = unique_letters.index(letter_t)
-    return scoring_matrix[index_s][index_t]
 
 
+smith_waterman('ABC', [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], 'ABCACA', 'BAACB')
 
+# smith_waterman('AGC', [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], 'AAAC', 'AGC')
+# smith_waterman('ACT', [[1,-1,-1,-2],[-1,1,-1,-2],[-1,-1,1,-2],[-2,-2,-2,0]], 'TAATA', 'TACTAA')
 
-# def smith_waterman1(unique_letters: str, scoring_matrix: list):
-#     unique_letters += '-'
-#     """
-#     Applies the smith waterman algorithm to produce an alignment of two sequences
-#     :param unique_letters: A string of unique letters of length p
-#     :param scoring_matrix: a (p + 1) × (p + 1) scoring matrix (list of lists)
-#     :param seq1: sequence 1
-#     :param seq2: sequence 2
-#     :return:
-#     """
-#
-#
-
-#
-# smith_waterman1('abc', [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]])
-# letter_s = 'c'; letter_t = '-'
+# smith_waterman('CTGA', [[1,-1,-1,-1,-5], [-1,1,-1,-1,-5], [-1,-1,1,-1,-5],
+#                         [-1,-1,-1,1,-5], [-5,-5,-5,-5,-5]], 'CATTCAC', 'CTCGCAGC')
 
