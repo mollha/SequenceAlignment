@@ -141,6 +141,11 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
                 col2 = []
         return max_indices, high_score
 
+    # TODO - need to add the start and end points to the indices alignment at an APPROPRIATE time
+    # Alternatively, could add them, then sort at the end
+
+
+
     # Get the start and end-points of a local alignment
     # -------------------------- Find the sub-sequences upon which to apply global alignment --------------------------
     (i_index, j_index), high_score = scan_matrix(seq_s, seq_t)
