@@ -1,7 +1,4 @@
 def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
-    print('seq s', seq_s)
-    print('seq t', seq_t)
-
     indel = len(alphabet)
     alphabet += '-'
     high_score = -float('inf')
@@ -55,53 +52,30 @@ def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
 
     # ---- BACKTRACK -----
     i, j = max_indices
-    align_seq_s, align_seq_t = '', ''
     alignment_s, alignment_t = [], []
 
     while True:       # while we haven't yet had to restart
         path = paths[i][j]
         if path == 'D':
-            align_seq_s += seq_s[i - 1]
-            align_seq_t += seq_t[j - 1]
             alignment_s.append(i-1)
             alignment_t.append(j-1)
             i, j, = i - 1, j - 1
         elif path == 'U':
-            align_seq_s += seq_s[i - 1]
-            align_seq_t += '-'
             i = i - 1
         elif path == 'L':
-            align_seq_s += '-'
-            align_seq_t += seq_t[j - 1]
             j = j - 1
         else:
             break
     alignment_s.reverse()
     alignment_t.reverse()
-    #
-    print(align_seq_s[::-1])
-    print(align_seq_t[::-1])
-
-    for row in values:
-        print(row)
-
-    for row in paths:
-        print(row)
-
     return [high_score, alignment_s, alignment_t]
 
-# SMITH WATERMAN TEST CASES
-# score = smith_waterman('ABC', [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], 'ABCACA', 'BAACB')
-# score = smith_waterman('AGC', [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], 'AAAC', 'AGC')
-# score = smith_waterman('ACT', [[1,-1,-1,-2],[-1,1,-1,-2],[-1,-1,1,-2],[-2,-2,-2,0]], 'TAATA', 'TACTAA')
-# score = smith_waterman('CTGA', [[1,-1,-1,-1,-5], [-1,1,-1,-1,-5], [-1,-1,1,-1,-5],
-#                         [-1,-1,-1,1,-5], [-5,-5,-5,-5,-5]], 'CATTCAC', 'CTCGCAGC')
 
 def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     indel = len(alphabet)
     alphabet += '-'
 
-    # Compute scores
+    # Compute SW scores
     def scan_matrix(seq_1, seq_2):
         col1, col2 = [], []
         high_score = -float('inf')
@@ -144,8 +118,6 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     # TODO - need to add the start and end points to the indices alignment at an APPROPRIATE time
     # Alternatively, could add them, then sort at the end
 
-
-
     # Get the start and end-points of a local alignment
     # -------------------------- Find the sub-sequences upon which to apply global alignment --------------------------
     (i_index, j_index), high_score = scan_matrix(seq_s, seq_t)
@@ -157,9 +129,51 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     t_add -= j_index        # s_add describes the value to add to indices of sequence t based on what has been removed
     # -----------------------------------------------------------------------------------------------------------------
 
-    def hirschberg():
-        pass
+    def hirschberg(seq_s, seq_t):
 
+        def get_last_row(seq_1, seq_2):
+            row1, row2 = [], []
+
+            for i in range(0, len(seq_1) + 1):
+                for j in range(0, len(seq_2) + 1):
+                    index_s = alphabet.index(seq_1[i - 1])
+                    index_t = alphabet.index(seq_2[j - 1])
+
+                    if not i and not j:
+                        # Append 0 to col1
+                        val = 0
+                        row1.append(val)
+                    elif not i:
+                        # Append value to col2
+                        val = max(row1[i] + scoring_matrix[indel][index_t])
+                        row2.append(val)
+                    elif not j:
+                        # Append value to col1
+                        val = max(row1[i - 1] + scoring_matrix[index_s][indel])
+                        row1.append(val)
+                    else:
+                        # At this stage, we can assume we have completed col1 - we only append to col2
+                        diag = row1[i - 1] + scoring_matrix[index_s][index_t]
+                        up = row2[i - 1] + scoring_matrix[index_s][indel]
+                        left = row1[i] + scoring_matrix[indel][index_t]
+                        val = max(diag, up, left)
+                        row2.append(val)
+                if row2:
+                    # check row2 isn't empty first i.e. it isn't the first pass
+                    row1 = row2
+                    row2 = []
+            return row2
+
+        # split the first sequence in half
+        last_row_1 = get_last_row(seq_s[0:len(seq_s) // 2], seq_t)
+        last_row_2 = get_last_row(seq_s[len(seq_s) // 2:][::-1], seq_t[::-1])
+
+        # sum the last rows
+        combined_rows = [x + y for x, y in zip(last_row_1, last_row_2[::-1])]
+        max_index = combined_rows.index(max(combined_rows))
+
+        hirschberg(seq_s[0:len(seq_s) // 2], seq_t[0:max_index])
+        hirschberg(seq_s[len(seq_s) // 2:], seq_t[max_index:])
 
 string1 = "AABBAACA"
 string2 = "AABBAACA"
