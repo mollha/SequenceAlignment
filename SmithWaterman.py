@@ -3,12 +3,67 @@ def get_score(alphabet: str, scoring_matrix: list, char_s: str, char_t: str):
     return scoring_matrix[alphabet.index(char_s)][alphabet.index(char_t)]
 
 
+def needleman_wunsch(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shift: tuple):
+    nw_matrix = []
+    paths_matrix = []
+    for i in range(0, len(seq_s) + 1):
+        nw_matrix.append([])
+        paths_matrix.append([])
+        for j in range(0, len(seq_t) + 1):
+            if not i and not j:
+                val = 0
+                path_val = 'R'
+            elif not i:
+                val = nw_matrix[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                path_val = 'L'
+            elif not j:
+                val = nw_matrix[i-1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                path_val = 'U'
+            else:
+                diag = nw_matrix[i-1][j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
+                up = nw_matrix[i-1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                left = nw_matrix[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                val = max(diag, up, left)
+                path_val = ['D', 'U', 'L'][[diag, up, left].index(val)]
+            nw_matrix[i].append(val)
+            paths_matrix[i].append(path_val)
+    #
+    # print('NW MATRIX')
+    # for row in nw_matrix:
+    #     print(row)
+    # print('\nPATH MATRIX')
+    # for row in paths_matrix:
+    #     print(row)
+
+    # ---- BACKTRACK -----
+    i, j = len(seq_s), len(seq_t)
+    alignment_s, alignment_t = [], []
+
+    while True:  # while we haven't yet had to restart
+        path = paths_matrix[i][j]
+        if path == 'D':
+            # print('add to alignment s ', shift[0] + i - 1)
+            # print('add to alignment t ', shift[1] + j - 1)
+            alignment_s.append(shift[0] + i - 1)
+            alignment_t.append(shift[1] + j - 1)
+            i, j, = i - 1, j - 1
+        elif path == 'U':
+            i = i - 1
+        elif path == 'L':
+            j = j - 1
+        else:
+            break
+    alignment_s.reverse()
+    alignment_t.reverse()
+    return alignment_s, alignment_t
+
+
 def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shift: tuple):
     # shift describes the number of shifts that need to be applied to the sequence indices
     if not seq_s or not seq_t:
         return [], []
-    if len(seq_s) == 1 and len(seq_t) == 1:
-        return [shift[0]], [shift[1]]
+    if len(seq_s) == 1 or len(seq_t) == 1:
+        return needleman_wunsch(alphabet, scoring_matrix, seq_s, seq_t, shift)
 
     def get_last_row(seq_1, seq_2):
         row1, row2 = [], []
@@ -32,13 +87,10 @@ def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shif
                     val = max(diag, up, left)
                     row2.append(val)
         return row2
-    print('seq_s ', seq_s)
-    print('seq_t ', seq_t)
 
     if len(seq_s) == 1:
         combined_rows = get_last_row(seq_s, seq_t)
         max_index = combined_rows.index(max(combined_rows))
-        print('combined_ row', combined_rows)
         return [shift[0]], [shift[1] + max_index]
 
     # split the first sequence in half
@@ -46,9 +98,11 @@ def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shif
     last_row_2 = get_last_row(seq_s[len(seq_s) // 2:][::-1], seq_t[::-1])
 
     combined_rows = [x + y for x, y in zip(last_row_1, last_row_2[::-1])]  # sum the last rows
+    # print('sequence s', seq_s)
+    # print('sequence t', seq_t)
+    #
+    # print(combined_rows)
     max_index = combined_rows.index(max(combined_rows))
-
-    # TODO check this works when seq_t has length 1
 
     h1_s_ind, h1_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[0:len(seq_s) // 2], seq_t[0:max_index], shift)
     h2_s_ind, h2_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[len(seq_s) // 2:], seq_t[max_index:],
@@ -56,10 +110,8 @@ def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shif
     return h1_s_ind + h2_s_ind, h1_t_ind + h2_t_ind
 
 
-b = hirschberg("AGTC_", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "TATGC", (0,0))
-print(b)
-b = hirschberg("AGTC_", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "T", (0,0))
-print(b)
+# b = hirschberg("AGTC_", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "TATGC", (0,0))
+# print(b)
 # -----------------------------------------------------------------------
 
 
@@ -134,7 +186,6 @@ def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
 
 
 def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
-    indel = len(alphabet)
     alphabet += '_'
 
     # Compute Smith-Waterman matrix scores using two columns at a time
@@ -183,12 +234,8 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     s_add -= i_index        # s_add describes the value to add to indices of sequence s based on what has been removed
     t_add -= j_index        # s_add describes the value to add to indices of sequence t based on what has been removed
     # -----------------------------------------------------------------------------------------------------------------
-    seq_s = "AGTACGCA"
-    seq_t = "TATGC"
-
-
-
-    # hirschberg(alphabet, scoring_matrix, seq_s, seq_t)
+    alignment_s, alignment_t = hirschberg(alphabet, scoring_matrix, seq_s, seq_t, (s_add, t_add))
+    return [high_score, alignment_s, alignment_t]
 
 
 
@@ -198,7 +245,8 @@ print("Score:   ", a[0])
 print("Indices: ", a[1],a[2])
 
 a = dynproglin ("AGTC", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "TATGC")
-
+print("Score:   ", a[0])
+print("Indices: ", a[1],a[2])
 
 #
 # string1 = "AABBAACA"
