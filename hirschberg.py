@@ -119,28 +119,41 @@ def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shif
         return row2
 
     # split the first sequence in half
-    last_row_1 = get_last_row(seq_s[0:len(seq_s) // 2], seq_t)
-    last_row_2 = get_last_row(seq_s[len(seq_s) // 2:][::-1], seq_t[::-1])
+    last_row_1 = get_last_row(seq_s[0:(len(seq_s)+1) // 2], seq_t)
+    print(seq_s[0:len(seq_s) // 2])
+    print(seq_s[len(seq_s) // 2:][::-1])
+    print('lr1', last_row_1)
+    last_row_2 = get_last_row(seq_s[(len(seq_s)+1) // 2:][::-1], seq_t[::-1])
+    print('lr2', last_row_2)
 
     combined_rows = [x + y for x, y in zip(last_row_1, last_row_2[::-1])]  # sum the last rows
     # print('sequence s', seq_s)
     # print('sequence t', seq_t)
     #
-    # print(combined_rows)
+    print(combined_rows)
     max_index = combined_rows.index(max(combined_rows))
+    print('Aligned s', seq_s[-1])
+    print('Aligned t', seq_t[max_index])
 
     print('len s', len(seq_s))
     print('len t', len(seq_t))
 
-    h1_s_ind, h1_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[0:len(seq_s) // 2], seq_t[0:max_index], shift)
-    h2_s_ind, h2_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[len(seq_s) // 2:], seq_t[max_index:],
-                                    (shift[0] + (len(seq_s) // 2), shift[1] + max_index))
+    h1_s_ind, h1_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[0:(len(seq_s)+1) // 2], seq_t[0:max_index+1], shift)
+    h2_s_ind, h2_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[(len(seq_s)+1) // 2:], seq_t[max_index+1:],
+                                    (shift[0] + ((len(seq_s)+1) // 2), shift[1] + max_index+1))
     print(h1_s_ind + h2_s_ind, h1_t_ind + h2_t_ind)
     return h1_s_ind + h2_s_ind, h1_t_ind + h2_t_ind
 
 
 # b = hirschberg("AGTC_", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "TATGC", (0,0))
 # print(b)
+# b = hirschberg("AGTC_", [[2,-1,-1,-1,-1],[-1,2,-1,-1,-1],[-1,-1,2,-1,-1],[-1,-1,-1,2,-1],[-1,-1,-1,-1,0]], "ACTGACCT", "TGTCC", (0,0))
+# print(b)
+# string_1, string_2 = "GATTACA", "GCATGCU"
+# c = hirschberg('AGTCU_', [[1,-1,-1,-1,-1,-1],[-1,1,-1,-1,-1,-1],[-1,-1,1,-1,-1,-1],[-1,-1,-1,1,-1,-1],[-1,-1,-1,-1,1,-1], [-1,-1,-1,-1,-1,-1]], string_1, string_2 ,(0,0))
+# print(c)
+# G_ATTACA
+# GCA_TCGU
 # -----------------------------------------------------------------------
 
 
@@ -209,9 +222,6 @@ def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
             j = j - 1
         else:
             break
-    print(max_indices)
-    for row in paths:
-        print(row)
 
     alignment_s.reverse()
     alignment_t.reverse()
