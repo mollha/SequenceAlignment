@@ -1,4 +1,26 @@
+# TODO functions need cleaning
+
 # -------------------------- HELPER FUNCTIONS -----------------------------
+def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t):
+    score = 0
+    align_seq_s, align_seq_t = '', ''
+    longest_sequence = max(len(seq_s), len(seq_t))
+    for i in range(longest_sequence):
+        if i in alignment_s:
+            align_seq_s += seq_s[i]
+        else:
+            align_seq_s += '_'
+    for j in range(longest_sequence):
+        if j in alignment_t:
+            align_seq_t += seq_t[j]
+        else:
+            align_seq_t += '_'
+    for index in range(longest_sequence):
+        char_s, char_t = align_seq_s[index], align_seq_t[index]
+        score += get_score(alphabet, scoring_matrix, char_s, char_t)
+
+    return score
+
 def get_score(alphabet: str, scoring_matrix: list, char_s: str, char_t: str):
     return scoring_matrix[alphabet.index(char_s)][alphabet.index(char_t)]
 
