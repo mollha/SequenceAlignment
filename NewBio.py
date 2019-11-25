@@ -1,43 +1,25 @@
 # ------------------------ HELPER FUNCTIONS --------------------------
-def check_score(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, alignment_s: list,
-                alignment_t: list) -> int:
-    score = 0
-    for i in range(alignment_s[0], alignment_s[-1]):
-        if i not in alignment_s:
-            score += get_score(alphabet, scoring_matrix, seq_s[i], '_')
-
-    for i in range(alignment_t[0], alignment_t[-1]):
-        if i not in alignment_t:
-            score += get_score(alphabet, scoring_matrix, '_', seq_t[i])
-
-    while alignment_s and alignment_t:
-        score += get_score(alphabet, scoring_matrix, seq_s[alignment_s[0]], seq_t[alignment_t[0]])
-        alignment_s = alignment_s[1:]
-        alignment_t = alignment_t[1:]
-    return score
-
-
-def last_row(alphabet: str, scoring_matrix: list, seq_1: str, seq_2: str) -> tuple:
+def last_row(alpha: str, scoring: list, seq_s: str, seq_t: str) -> tuple:
     max_val, max_index = -float('inf'), [1, 1]
 
     # Init rows to 0s (as local alignment)
-    prev_row = [0 for _ in range(len(seq_1) + 1)]
-    current_row = [0 for _ in range(len(seq_1) + 1)]
+    prev_row = [0 for _ in range(len(seq_s) + 1)]
+    current_row = [0 for _ in range(len(seq_s) + 1)]
 
     # Init first row
-    for j in range(1, len(seq_1) + 1):
-        prev_row[j] = max(0, prev_row[j - 1] + get_score(alphabet, scoring_matrix, seq_1[j - 1], '_'))
+    for j in range(1, len(seq_s) + 1):
+        prev_row[j] = max(0, prev_row[j - 1] + get_score(alpha, scoring, seq_s[j - 1], '_'))
 
     # Loop over remaining rows and calc scores
-    for i in range(1, len(seq_2) + 1):
+    for i in range(1, len(seq_t) + 1):
         # Get first value in new row
-        current_row[0] = max(0, prev_row[0] + get_score(alphabet, scoring_matrix, '_', seq_2[i - 1]))  # del/up
+        current_row[0] = max(0, prev_row[0] + get_score(alpha, scoring, '_', seq_t[i - 1]))  # del/up
 
         # Evaluate each value in row
-        for j in range(1, len(seq_1) + 1):
-            score_sub = prev_row[j - 1] + get_score(alphabet, scoring_matrix, seq_1[j - 1], seq_2[i - 1])
-            score_ins = current_row[j - 1] + get_score(alphabet, scoring_matrix, seq_1[j - 1], '_')
-            score_del = prev_row[j] + get_score(alphabet, scoring_matrix, '_', seq_2[i - 1])
+        for j in range(1, len(seq_s) + 1):
+            score_sub = prev_row[j - 1] + get_score(alpha, scoring, seq_s[j - 1], seq_t[i - 1])
+            score_ins = current_row[j - 1] + get_score(alpha, scoring, seq_s[j - 1], '_')
+            score_del = prev_row[j] + get_score(alpha, scoring, '_', seq_t[i - 1])
 
             # Local alignment -> max(vals, 0)
             current_row[j] = max(0, score_sub, score_del, score_ins)
@@ -49,14 +31,14 @@ def last_row(alphabet: str, scoring_matrix: list, seq_1: str, seq_2: str) -> tup
 
         # Update prev row & clear current row
         prev_row = current_row
-        current_row = [0 for _ in range(len(seq_1) + 1)]
+        current_row = [0 for _ in range(len(seq_s) + 1)]
 
     return prev_row, max_val, max_index
 
 
-def get_score(alphabet: str, scoring_matrix: list, char_s: str, char_t: str) -> int:
-    alphabet += '_'
-    return scoring_matrix[alphabet.index(char_s)][alphabet.index(char_t)]
+def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
+    alpha += '_'
+    return scoring[alpha.index(char_s)][alpha.index(char_t)]
 
 
 def backtrack(paths: list, max_indices: tuple) -> tuple:
@@ -204,15 +186,7 @@ alphabet = "ABCD"
 a = dynprog(alphabet, scoring_matrix, string_1, string_2)
 print("Score:   ", a[0])
 print("Indices: ", a[1], a[2])
-score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1], a[2])
-print('CHECKING SCORE: {} \n'.format(score))
-recent_score = score
-#
 
 a = dynproglin(alphabet, scoring_matrix, string_1, string_2)
 print("Score:   ", a[0])
 print("Indices: ", a[1], a[2])
-score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1], a[2])
-print('CHECKING SCORE: {} \n'.format(score))
-if score != recent_score:
-    print(string_1 + ' and ' + string_2 + ' do not have matching alignments...')
