@@ -1,5 +1,6 @@
 # ------------------------ HELPER FUNCTIONS --------------------------
-def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t):
+def check_score(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, alignment_s: list,
+                alignment_t: list) -> int:
     score = 0
     for i in range(alignment_s[0], alignment_s[-1]):
         if i not in alignment_s:
@@ -15,7 +16,8 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         alignment_t = alignment_t[1:]
     return score
 
-def last_row(alphabet, scoring_matrix, seq_1, seq_2):
+
+def last_row(alphabet: str, scoring_matrix: list, seq_1: str, seq_2: str) -> tuple:
     max_val, max_index = -float('inf'), [1, 1]
 
     # Init rows to 0s (as local alignment)
@@ -105,43 +107,23 @@ def needleman_wunsch(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str
     return backtrack(paths, (len(seq_s), len(seq_t)))
 
 
-def hirschberg(alphabet, scoring_matrix, seq1, seq2, seq1_offset, seq2_offset):
-    out1_indices, out2_indices = [], []
-
-    # Apply SW for optimal local alignment
-    if len(seq1) == 1 or len(seq2) == 1:
-        needleman_output = needleman_wunsch(alphabet, scoring_matrix, seq1, seq2)
-        out1_indices, out2_indices = needleman_output[0], needleman_output[1]
-        out1_indices = [x + seq1_offset for x in out1_indices]
-        out2_indices = [x + seq2_offset for x in out2_indices]
-
+def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, offset: tuple) -> tuple:
+    if len(seq_s) == 1 or len(seq_t) == 1:
+        alignment_s, alignment_t = needleman_wunsch(alphabet, scoring_matrix, seq_s, seq_t)
+        return [s + offset[0] for s in alignment_s], [t + offset[1] for t in alignment_t]
     else:
-        # Get midpoint of Seq2
-        seq2_mid = len(seq2) // 2
+        last_row_1, _, _ = last_row(alphabet, scoring_matrix, seq_s, seq_t[:len(seq_t) // 2])
+        last_row_2, _, _ = last_row(alphabet, scoring_matrix, seq_s[::-1], seq_t[len(seq_t) // 2:][::-1])
+        last_row_2.reverse()
+        index, _ = max(enumerate([x + y for x, y in zip(last_row_1, last_row_2)]), key=lambda x: x[1])
 
-        # Get scoring of lhs (in linear space)
-        r_left, _, _ = last_row(alphabet, scoring_matrix, seq1, seq2[:seq2_mid])
+        alignment_s_half1, alignment_t_half1 = hirschberg(alphabet, scoring_matrix, seq_s[:index],
+                                                          seq_t[:len(seq_t) // 2], offset)
+        alignment_s_half2, alignment_t_half2 = hirschberg(alphabet, scoring_matrix, seq_s[index:],
+                                                          seq_t[len(seq_t) // 2:],
+                                                          (offset[0] + index, offset[1] + len(seq_t) // 2))
 
-        # Get scoring of rhs (in linear space) [reversed]
-        r_right, _, _ = last_row(alphabet, scoring_matrix, seq1[::-1], seq2[seq2_mid:][::-1])
-        r_right.reverse()  # flip back again for calculating total score
-
-        # Sum values and find argmax
-        row = [l + r for l, r in zip(r_left, r_right)]
-        maxidx, maxval = max(enumerate(row), key=lambda a: a[1])
-
-        # Partition seq1 at argmax
-        seq1_mid = maxidx
-
-        # Recursively call align on each half
-        aligned_1_left_indices, aligned_2_left_indices = hirschberg(alphabet, scoring_matrix, seq1[:seq1_mid], seq2[:seq2_mid], seq1_offset, seq2_offset)
-        aligned_1_right_indices, aligned_2_right_indices = hirschberg(alphabet, scoring_matrix, seq1[seq1_mid:], seq2[seq2_mid:], seq1_offset + seq1_mid, seq2_offset + seq2_mid)
-
-        # Add results of recursive calls to out vars
-        out1_indices = aligned_1_left_indices + aligned_1_right_indices
-        out2_indices = aligned_2_left_indices + aligned_2_right_indices
-
-    return out1_indices, out2_indices
+    return alignment_s_half1 + alignment_s_half2, alignment_t_half1 + alignment_t_half2
 
 
 # ---------------------------------------------------------------------
@@ -156,28 +138,28 @@ def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     for i in range(0, len(seq_s) + 1):
         values.append([])
         paths.append([])
-        for j in range(0, len(seq_t)+1):
+        for j in range(0, len(seq_t) + 1):
             path_val = ''
 
             if not i and not j:
                 val = 0
                 path_val = 'R'
             elif not i:
-                val = max(0, values[i][j-1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
+                val = max(0, values[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
                 if not val:
                     path_val = 'R'
                 else:
                     path_val = 'L'
             elif not j:
-                val = max(0, values[i-1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
+                val = max(0, values[i - 1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
                 if not val:
                     path_val = 'R'
                 else:
                     path_val = 'U'
             else:
-                diag = values[i-1][j-1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
-                up = values[i-1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
-                left = values[i][j-1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                diag = values[i - 1][j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
+                up = values[i - 1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                left = values[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
                 val = max(0, diag, up, left)
 
                 if val == diag:
@@ -198,35 +180,39 @@ def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     alignment_s, alignment_t = backtrack(paths, max_indices)
     return [high_score, alignment_s, alignment_t]
 
-def dynproglin (alphabet, scoring_matrix, seq_s, seq_t):
-    _, max_val, max_index = last_row(alphabet, scoring_matrix, seq_s, seq_t)
+
+def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> list:
+    _, high_score, max_index = last_row(alphabet, scoring_matrix, seq_s, seq_t)
     # Get min index from backward pass
     _, _, min_index = last_row(alphabet, scoring_matrix, seq_s[::-1], seq_t[::-1])
 
     # Subtract lengths from min index (s.t. actual start position)
-    min_index[1] = len(seq_s) - min_index[1]
-    min_index[0] = len(seq_t) - min_index[0]
-    alignment_s, alignment_t = hirschberg(alphabet, scoring_matrix, seq_s[min_index[1]:max_index[1]], seq_t[min_index[0]:max_index[0]], min_index[1],
-          min_index[0])
-    return max_val, alignment_s, alignment_t
+    i, j = len(seq_t) - min_index[0], len(seq_s) - min_index[1]
+    alignment_s, alignment_t = hirschberg(alphabet, scoring_matrix, seq_s[j:max_index[1]],
+                                          seq_t[i:max_index[0]], (j, i))
+    return [high_score, alignment_s, alignment_t]
 
+
+# ---------------------------------------------------------------------------------------------------------------------
+
+# TESTS
 string_1, string_2 = "AACCDDAACC", "CADDACDDAA"
-scoring_matrix = [[ 1,-5,-5,-5,-1],[-5, 1,-5,-5,-1],[-5,-5, 5,-5,-4],[-5,-5,-5, 6,-4],[-1,-1,-4,-4,-9]]
+scoring_matrix = [[1, -5, -5, -5, -1], [-5, 1, -5, -5, -1], [-5, -5, 5, -5, -4], [-5, -5, -5, 6, -4],
+                  [-1, -1, -4, -4, -9]]
 alphabet = "ABCD"
-#
-a = dynprog (alphabet, scoring_matrix, string_1, string_2)
+
+a = dynprog(alphabet, scoring_matrix, string_1, string_2)
 print("Score:   ", a[0])
-print("Indices: ", a[1],a[2])
-score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+print("Indices: ", a[1], a[2])
+score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1], a[2])
 print('CHECKING SCORE: {} \n'.format(score))
 recent_score = score
 #
 
-a = dynproglin (alphabet, scoring_matrix, string_1, string_2)
+a = dynproglin(alphabet, scoring_matrix, string_1, string_2)
 print("Score:   ", a[0])
-print("Indices: ", a[1],a[2])
-score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+print("Indices: ", a[1], a[2])
+score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1], a[2])
 print('CHECKING SCORE: {} \n'.format(score))
 if score != recent_score:
     print(string_1 + ' and ' + string_2 + ' do not have matching alignments...')
-
