@@ -1,24 +1,18 @@
-# TODO functions need cleaning
-
 # -------------------------- HELPER FUNCTIONS -----------------------------
 def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t):
     score = 0
-    align_seq_s, align_seq_t = '', ''
-    longest_sequence = max(len(seq_s), len(seq_t))
-    for i in range(longest_sequence):
-        if i in alignment_s:
-            align_seq_s += seq_s[i]
-        else:
-            align_seq_s += '_'
-    for j in range(longest_sequence):
-        if j in alignment_t:
-            align_seq_t += seq_t[j]
-        else:
-            align_seq_t += '_'
-    for index in range(longest_sequence):
-        char_s, char_t = align_seq_s[index], align_seq_t[index]
-        score += get_score(alphabet, scoring_matrix, char_s, char_t)
+    for i in range(alignment_s[0], alignment_s[-1]):
+        if i not in alignment_s:
+            score += get_score(alphabet, scoring_matrix, seq_s[i], '_')
 
+    for i in range(alignment_t[0], alignment_t[-1]):
+        if i not in alignment_t:
+            score += get_score(alphabet, scoring_matrix, '_', seq_t[i])
+
+    while alignment_s and alignment_t:
+        score += get_score(alphabet, scoring_matrix, seq_s[alignment_s[0]], seq_t[alignment_t[0]])
+        alignment_s = alignment_s[1:]
+        alignment_t = alignment_t[1:]
     return score
 
 def get_score(alphabet: str, scoring_matrix: list, char_s: str, char_t: str):
@@ -59,32 +53,54 @@ def needleman_wunsch(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str
 
     # ---- BACKTRACK -----
     i, j = len(seq_s), len(seq_t)
-    alignment_s, alignment_t = [], []
+    alignment_s, alignment_t = "", ""
 
     while True:  # while we haven't yet had to restart
         path = paths_matrix[i][j]
         if path == 'D':
-            # print('add to alignment s ', shift[0] + i - 1)
-            # print('add to alignment t ', shift[1] + j - 1)
-            alignment_s.append(shift[0] + i - 1)
-            alignment_t.append(shift[1] + j - 1)
+            alignment_s += seq_s[i - 1]
+            alignment_t += seq_t[j - 1]
             i, j, = i - 1, j - 1
         elif path == 'U':
+            alignment_s += seq_s[i - 1]
+            alignment_t += '_'
             i = i - 1
         elif path == 'L':
+            alignment_t += seq_t[j - 1]
+            alignment_s += '_'
             j = j - 1
         else:
             break
-    alignment_s.reverse()
-    alignment_t.reverse()
-    return alignment_s, alignment_t
+    return alignment_s[::-1], alignment_t[::-1]
+
+# NW TEST
+# string_1, string_2 = "GATTACA", "GCATGCU"
+# c = needleman_wunsch('AGTCU_', [[1,-1,-1,-1,-1,-1],[-1,1,-1,-1,-1,-1],[-1,-1,1,-1,-1,-1],[-1,-1,-1,1,-1,-1],[-1,-1,-1,-1,1,-1], [-1,-1,-1,-1,-1,-1]], string_1, string_2 ,(0,0))
+# print(c)
+# # G_ATTACA
+# # GCA_TCGU
 
 
 def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shift: tuple):
-    # shift describes the number of shifts that need to be applied to the sequence indices
+    alignment_s = ''
+    alignment_t = ''
+
+    print('Sequence S', seq_s)
+    print('Sequence T', seq_t)
+    if not seq_s:
+        for j in range(len(seq_t)):
+            alignment_s += '_'
+        return alignment_s, seq_t
+    if not seq_t:
+        for i in range(len(seq_s)):
+            alignment_t += '_'
+        return seq_s, alignment_t
+
+
     if not seq_s or not seq_t:
-        return [], []
+        return "", ""
     if len(seq_s) == 1 or len(seq_t) == 1:
+        print(needleman_wunsch(alphabet, scoring_matrix, seq_s, seq_t, shift))
         return needleman_wunsch(alphabet, scoring_matrix, seq_s, seq_t, shift)
 
     def get_last_row(seq_1, seq_2):
@@ -110,30 +126,38 @@ def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shif
                     row2.append(val)
         return row2
 
-    if len(seq_s) == 1:
-        combined_rows = get_last_row(seq_s, seq_t)
-        max_index = combined_rows.index(max(combined_rows))
-        return [shift[0]], [shift[1] + max_index]
-
     # split the first sequence in half
     last_row_1 = get_last_row(seq_s[0:len(seq_s) // 2], seq_t)
-    last_row_2 = get_last_row(seq_s[len(seq_s) // 2:][::-1], seq_t[::-1])
+    last_row_2 = get_last_row(seq_s[len(seq_s)// 2:][::-1], seq_t[::-1])
 
     combined_rows = [x + y for x, y in zip(last_row_1, last_row_2[::-1])]  # sum the last rows
     # print('sequence s', seq_s)
     # print('sequence t', seq_t)
     #
-    # print(combined_rows)
     max_index = combined_rows.index(max(combined_rows))
+    print('combined rows', combined_rows)
+    print('max index', max_index)
 
-    h1_s_ind, h1_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[0:len(seq_s) // 2], seq_t[0:max_index], shift)
+    h1_s_ind, h1_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[0:len(seq_s) // 2], seq_t[0:max_index+1], shift)
     h2_s_ind, h2_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[len(seq_s) // 2:], seq_t[max_index:],
-               (shift[0] + (len(seq_s) // 2), shift[1] + max_index))
+                                    (shift[0] + (len(seq_s) // 2), shift[1] + max_index))
     return h1_s_ind + h2_s_ind, h1_t_ind + h2_t_ind
 
 
-# b = hirschberg("AGTC_", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "TATGC", (0,0))
+# b = hirschberg("AGTC_", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "GATCGTA", "GACGGGA", (0,0))
 # print(b)
+
+b = hirschberg("AGTC_", [[2,-3,-3,-3,-2],[-3,2,-3,-3,-2],[-3,-3,2,-3,-2],[-3,-3,-3,2,-2],[-2,-2,-2,-2,0]], "ACGCATCA", "ACTGATTCA", (0,0))
+print(b)
+
+
+# b = hirschberg("AGTC_", [[2,-1,-1,-1,-1],[-1,2,-1,-1,-1],[-1,-1,2,-1,-1],[-1,-1,-1,2,-1],[-1,-1,-1,-1,0]], "ACTGACCT", "TGTCC", (0,0))
+# print(b)
+# string_1, string_2 = "GATTACA", "GCATGCU"
+# c = hirschberg('AGTCU_', [[1,-1,-1,-1,-1,-1],[-1,1,-1,-1,-1,-1],[-1,-1,1,-1,-1,-1],[-1,-1,-1,1,-1,-1],[-1,-1,-1,-1,1,-1], [-1,-1,-1,-1,-1,-1]], string_1, string_2 ,(0,0))
+# print(c)
+# G_ATTACA
+# GCA_TCGU
 # -----------------------------------------------------------------------
 
 
@@ -202,6 +226,8 @@ def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
             j = j - 1
         else:
             break
+    for row in values:
+        print(row)
     alignment_s.reverse()
     alignment_t.reverse()
     return [high_score, alignment_s, alignment_t]
@@ -255,74 +281,68 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     seq_s, seq_t = seq_s[0:i_index][::-1], seq_t[0:j_index][::-1]
     s_add -= i_index        # s_add describes the value to add to indices of sequence s based on what has been removed
     t_add -= j_index        # s_add describes the value to add to indices of sequence t based on what has been removed
+    print('s add', s_add)
+    print('t add', t_add)
     # -----------------------------------------------------------------------------------------------------------------
+
     alignment_s, alignment_t = hirschberg(alphabet, scoring_matrix, seq_s, seq_t, (s_add, t_add))
-    return [high_score, alignment_s, alignment_t]
+    s_list, t_list = [], []
 
 
 
-# HIRSCHBERG TESTS
-a = dynprog ("AGTC", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "TATGC")
-print("Score:   ", a[0])
-print("Indices: ", a[1],a[2])
+    print('Alignment s', alignment_s)
+    print('Alignment t', alignment_t)
+    s_pointer, t_pointer, i = 0, 0, 0
+    for index in range(len(alignment_s)):
+        if alignment_s[index] != '_' and alignment_t[index] != '_':
+            s_list.append(s_pointer)
+            t_list.append(t_pointer)
+        if alignment_s[index] != '_':
+            s_pointer += 1
+        if alignment_t[index] != '_':
+            t_pointer += 1
 
-a = dynproglin ("AGTC", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "TATGC")
-print("Score:   ", a[0])
-print("Indices: ", a[1],a[2])
 
-#
-# string1 = "AABBAACA"
-# string2 = "AABBAACA"
-# # a = dynprog ("ABC", [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], "AABBAACA", "CBACCCBA")
-#
-# # a = dynprog ("ABC", [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], string1, string2)
-# # print("Score:   ", a[0])
-# # print("Indices: ", a[1],a[2])
-#
-#
-# # a = dynprog("ABCD", [[1, -5, -5, -5, -1], [-5, 1, -5, -5, -1], [-5, -5, 5, -5, -4], [-5, -5, -5, 6, -4], [-1, -1, -4, -4, -9]],
-# #             "DDCDDCCCDCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACCCCDDDCDADCDCDCDCD",
-# #             "DDCDDCCCDCBCCCCDDDCDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBDCDCDCDCD")
-# # print("Score:   ", a[0])
-# # print("Indices: ", a[1],a[2])
-#
-# a = dynproglin("ABCD", [[1, -5, -5, -5, -1], [-5, 1, -5, -5, -1], [-5, -5, 5, -5, -4], [-5, -5, -5, 6, -4], [-1, -1, -4, -4, -9]],
-#             "AABCCDCA", "CADBCDBBDD")
-#
-# print('\n')
-#
-# a = dynprog("ABCD", [[1, -5, -5, -5, -1], [-5, 1, -5, -5, -1], [-5, -5, 5, -5, -4], [-5, -5, -5, 6, -4], [-1, -1, -4, -4, -9]],
-#             "AABCCDCA", "CADBCDBBDD")
-# print("Score:   ", a[0])
-# print("Indices: ", a[1], a[2])
-# print('\n')
-#
-# a = dynprog("ABCD", [[1, -5, -5, -5, -1], [-5, 1, -5, -5, -1], [-5, -5, 5, -5, -4], [-5, -5, -5, 6, -4], [-1, -1, -4, -4, -9]],
-#             "ACDCCBAA", "DDBBDCBDAC")
+    return [high_score, s_list, t_list]
+
+#put ALL your code here
+
+string_1, string_2 = "AABBAACA", "CBACCCBA"
+scoring_matrix = [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]]
+alphabet = "ABC"
+
+# a = dynprog ("ABC", scoring_matrix, string_1, string_2)
 # print("Score:   ", a[0])
 # print("Indices: ", a[1],a[2])
+# score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+# print('CHECKING SCORE: {} \n'.format(score))
+# recent_score = score
 #
-# # a = dynprog("ABCD", [[1, -5, -5, -5, -1], [-5, 1, -5, -5, -1], [-5, -5, 5, -5, -4], [-5, -5, -5, 6, -4], [-1, -1, -4, -4, -9]],
-# #             "ACDCCBAA", "CDCDDD")
-# # print("Score:   ", a[0])
-# # print("Indices: ", a[1],a[2])
+# a = dynproglin ("ABC", scoring_matrix, string_1, string_2)
+# print("Score:   ", a[0])
+# print("Indices: ", a[1],a[2])
+# score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+# print('CHECKING SCORE: {} \n'.format(score))
+# if score != recent_score:
+#     print(string_1 + ' and ' + string_2 + ' do not have matching alignments...')
+
+string_1, string_2 = "AACCDDAACC", "CADDACDDAA"
+scoring_matrix = [[ 1,-5,-5,-5,-1],[-5, 1,-5,-5,-1],[-5,-5, 5,-5,-4],[-5,-5,-5, 6,-4],[-1,-1,-4,-4,-9]]
+alphabet = "ABCD"
 #
-#
-# # a = dynproglin("ABCD", [[1, -5, -5, -5, -1], [-5, 1, -5, -5, -1], [-5, -5, 5, -5, -4], [-5, -5, -5, 6, -4], [-1, -1, -4, -4, -9]],
-# #             "AACAAADAAAACAADAADAAA", "CDCDDD")
-# # print("Score:   ", a[0])
-# # print("Indices: ", a[1],a[2])
-#
-# # a = dynprog ("ABC", [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], string1[::-1], string2[::-1])
-# # print("Score:   ", a[0])
-# # print("Indices: ", a[1],a[2])
-#
-# # a = dynproglin ("ABC", [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], "AABBAACA", "CBACCCBA")
-# # b = dynproglin ("ABC", [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]], "AABBAAC", "CBAB")
-#
-# # def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
-# #     # BLAST
+# a = dynprog (alphabet, scoring_matrix, string_1, string_2)
+# print("Score:   ", a[0])
+# print("Indices: ", a[1],a[2])
+# score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+# print('CHECKING SCORE: {} \n'.format(score))
+# recent_score = score
 # #
-# #     indel = len(alphabet)
-# #     alphabet += '_'
-# #     threshold = 1  # threshold
+#
+# a = dynproglin (alphabet, scoring_matrix, string_1, string_2)
+# print("Score:   ", a[0])
+# print("Indices: ", a[1],a[2])
+# score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+# print('CHECKING SCORE: {} \n'.format(score))
+# if score != recent_score:
+#     print(string_1 + ' and ' + string_2 + ' do not have matching alignments...')
+

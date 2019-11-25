@@ -1,371 +1,329 @@
-import numpy as np
-from itertools import product
-
-# http://biorecipes.com/DynProgBasic/code.html
-def dynprog(alphabet, scoring_matrix, s, t):
-
-    global ALPHABET, SCORING_MATRIX
-
-    ALPHABET = alphabet + "_"
-    SCORING_MATRIX = np.array(scoring_matrix)
-
-    D = build_score_matrix(s, t)
-
-
-
-
-    score, s_align, t_align, s_matches, t_matches = traceback(D, s, t)
-
-    return score, s_matches, t_matches, s_align, t_align
-
-# https://en.wikipedia.org/wiki/Hirschberg's_algorithm
-def dynproglin(alphabet, scoring_matrix, s, t):
-
-    global ALPHABET, SCORING_MATRIX
-
-    ALPHABET = alphabet + "_"
-    SCORING_MATRIX = np.array(scoring_matrix)
-
-    def recurse(s, t):
-
-        s_align, t_align = "", ""
-
-        if len(s) == 0 or len(t) == 0:
-
-            s_align = ""
-            t_align = ""
-
-        elif len(s) == 1 or len(t) == 1:
-
-            result = dynprog(alphabet, scoring_matrix, s, t)
-            s_align = result[3]
-            t_align = result[4]
-
-        else:
-
-            s_mid = int(len(s) / 2)
-            score_l = build_score_matrix(s[:s_mid], t, sublinear=True)
-            score_r = build_score_matrix(rev(s[s_mid:]), rev(t), sublinear=True)
-            t_mid = np.argmax(score_l + rev(score_r))
-
-            z_l, w_l = recurse(s[:s_mid], t[:t_mid])
-            z_r, w_r = recurse(s[s_mid:], t[t_mid:])
-
-            s_align = z_l + z_r
-            t_align = w_l + w_r
-
-        return s_align, t_align
-
-    s_align, t_align = recurse(s, t)
-
-    # So it's BACA, BACA. This doesn't exist.
-    # If the scoring matrix is the same... let's just double-check again that it is. For my peace of mind, at least.
-    # maybe that's part of the complexity?
-    # Ah. It's a different matrix. On the second-last row, mind, which indicates to me it's an off-by-one.
-    # The alignment, score, and matches are different. Of course it's all of them. But more interestingly, we're appended characters that shouldn't eist.
-
-    print(s_align, t_align)
-
-    score = align_score(s_align, t_align)
-    s_matches, t_matches = get_alignment_indices(s_align, t_align)
-
-    # No... it's more than that.
-    # We're actually a row short.
-
-    return score, s_matches, t_matches, s_align, t_align
-
-# file:///C:/Users/user/Documents/MEGA/University/Year%203/CCS/Bioinformatics/HeuristicAlign.pdf
-def heuralign(alphabet, scoring_matrix, s, t):
-
-    # s (database), |s| >> |t| is the y-axis
-    # t (query), is the x-axis
-
-    global SCORING_MATRIX, ALPHABET
-
-    SCORING_MATRIX = np.array(scoring_matrix)
-    ALPHABET = alphabet + "_"
-
-    ktup = 3
-    lookup = {"".join(i): [] for i in product(alphabet, repeat=ktup)}
-
-    for y in range(len(s) - ktup + 1):
-
-        word = s[y:y + ktup]
-        lookup[word].append(y)
-
-    print(lookup)
-
-    matches = []
-
-    for x in range(len(t) - ktup + 1):
-
-        word = t[x:x + ktup]
-
-        print(word)
-
-        for y in lookup[word]:
-
-            extended = extend(s, t, (x, y, ktup))
-
-            matches.append(extended)
-
-    print(matches)
-
-    diagonals = dict()
-    k = 9
-
-    for match in matches:
-
-        x, y, length = match
-
-        i = k * ((y - x) // k)
-
-        if i not in diagonals:
-
-            diagonals[i] = [match]
-
-        else:
-
-            diagonals[i].append(match)
-
-    for key, value in diagonals.items():
-
-        start_x = 0
-        start_y = 0
-        end_x_match = None
-        end_y_match = None
-
-        for match in value:
-
-            if match[0][0] < start_x:
-
-                start_x = match[0][0]
-
-            if match[1][1] < start_y:
-
-                start_y = match[1][1]
-
-            if end_y_match is None or match[1] + match[2] > end_y_match:
-
-                end_y_match = end_y_match
-
-            if end_x_match is None or match[0] + match[2] > end_x_match:
-
-                end_x_match = end_x_match
-
-        end_x = end_x_match[0] + end_x_match[2]
-        end_y = end_y_match[1] + end_y_match[2]
-
-        s = s[start_y:end_y]
-        t = t[start_x:end_x]
-
-        D = build_score_matrix_banded(s, t, k)
-
-        score, s_align, t_align, s_matches, t_matches = traceback(D, s, t)
-
-        return score, s_matches, t_matches, s_align, t_align
-
-
-
-def extend(s, t, match):
-
-    x, y, length = match
-
-    while x > 0 and y > 0:
-
-        if cost(t[x - 1], s[y - 1]) > 0:
-
-            x -= 1
-            y -= 1
-            length += 1
-
-        else:
-
-            break
-
-    while x + length + 1 < len(t) and y + length + 1 < len(s):
-
-        if cost(t[x + 1], s[y + 1]) > 0:
-
-            length += 1
-
-        else:
-
-            break
-
-    return x, y, length
-
-
-def build_score_matrix_banded(s, t, k):
-
-    size_y = len(s) + 1  # y-axis
-    size_x = len(t) + 1  # x-axis
-    D = np.zeros((size_y, size_x), dtype="int8")
-    width = int(k / 2)
-
-    for y in range(size_y):
-
-        for x in range(y - width, y + width + 1):
-
-            if 0 <= x < size_x and y > 0:
-
-                D[y, x] = max(
-                    0,  # For local alignment
-                    match(D, y, x, s, y, t),  # The cost of matching two characters
-                    insert_gap_into_s(D, y, x, t),  # The cost of matching a gap in s with a character in t
-                    insert_gap_into_t(D, y, x, s, y)  # The cost of matching a gap in t with a character in s
-                )
-
-    return D
-
-def get_alignment_indices(s_align, t_align):
-
-    s_matches, t_matches = [], []
-    s_point, t_point = 0, 0
-
-    for i in range(len(s_align)):
-
-        if s_align[i] != "_" and t_align[i] != "_":
-
-            s_matches.append(s_point)
-            t_matches.append(t_point)
-
-            s_point += 1
-            t_point += 1
-
-        if s_align[i] != "_" and t_align[i] == "_":
-
-            s_point += 1
-
-        if s_align[i] == "_" and t_align[i] != "_":
-
-            t_point += 1
-
-    return s_matches, t_matches
-
-def build_score_matrix(s, t, sublinear=False):
-
-    size_y = len(s) + 1  # y-axis
-    size_x = len(t) + 1  # x-axis
-    shape = (2, size_x) if sublinear else (size_y, size_x)
-    D = np.zeros(shape, dtype="int8")
-
-    for y in range(1, size_y):  # y
-
-        D_y = 1 if sublinear else y
-
-        for x in range(1, size_x):
-
-            D[D_y, x] = max(
-                0,  # For local alignment
-                match(D, D_y, x, s, y, t),  # The cost of matching two characters
-                insert_gap_into_s(D, D_y, x, t),  # The cost of matching a gap in s with a character in t
-                insert_gap_into_t(D, D_y, x, s, y)  # The cost of matching a gap in t with a character in s
-            )
-
-        if sublinear and y < size_y - 1: # Copy the 1st row onto the second row unless it's the final iteration
-
-            D[0] = D[1].copy()
-            D[1] = 0
-
-    return D[1] if sublinear else D
-
-def match(D, D_y, x, s, s_y, t):   # Conceptually D
-
-    return D[D_y - 1][x - 1] + cost(s[s_y - 1], t[x - 1])
-
-def insert_gap_into_s(D, D_y, x, t):  # s is the y-axis string: conceptually L
-
-    return D[D_y][x - 1] + cost(t[x - 1], "_")
-
-def insert_gap_into_t(D, D_y, x, s, s_y):  # t is the x-axis string: conceptually U
-
-    return D[D_y - 1][x] + cost(s[s_y - 1], "_")
-
-def traceback(D, s, t):
-
-    score = np.amax(D)
-    y, x = np.unravel_index(D.argmax(), D.shape)
-
-    # We don't need the traceback, right?
-
-    s_align, t_align = "", ""
-    s_matches = []
-    t_matches = []
-
-    while y != 0 or x != 0:
-
-        current = D[y][x]
-
-        if current == 0:  # The end of the best local alignment
-
-            return score, s_align, t_align, s_matches[::-1], t_matches[::-1]
-
-        elif current == match(D, y, x, s, y, t): # D
-
-            x -= 1
-            y -= 1
-            s_align = s[y] + s_align
-            t_align = t[x] + t_align
-
-            s_matches.append(y)
-            t_matches.append(x)
-
-        elif current == insert_gap_into_s(D, y, x, t):  # L
-
-            x -= 1
-            s_align = "_" + s_align
-            t_align = t[x] + t_align
-
-
-        elif current == insert_gap_into_t(D, y, x, s, y):  # U
-
-            y -= 1
-            s_align = s[y] + s_align
-            t_align = "_" + t_align
-
-        else:
-
-            raise ValueError("Something's fucked!")
-
-    return score, s_align, t_align, s_matches[::-1], t_matches[::-1]
-
-def cost(c1, c2):
-
-    global ALPHABET, SCORING_MATRIX
-
-    print(ALPHABET)
-    print(SCORING_MATRIX)
-
-    return SCORING_MATRIX[ALPHABET.index(c1), ALPHABET.index(c2)]
-
-def align_score(s_align, t_align):
-
+# -------------------------- HELPER FUNCTIONS -----------------------------
+def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t):
     score = 0
+    for i in range(alignment_s[0], alignment_s[-1]):
+        if i not in alignment_s:
+            score += get_score(alphabet, scoring_matrix, seq_s[i], '_')
 
-    for i in range(len(s_align)):
+    for i in range(alignment_t[0], alignment_t[-1]):
+        if i not in alignment_t:
+            score += get_score(alphabet, scoring_matrix, '_', seq_t[i])
 
-        score += cost(s_align[i], t_align[i])
-
+    while alignment_s and alignment_t:
+        score += get_score(alphabet, scoring_matrix, seq_s[alignment_s[0]], seq_t[alignment_t[0]])
+        alignment_s = alignment_s[1:]
+        alignment_t = alignment_t[1:]
     return score
 
-def rev(l):
+def get_score(alphabet: str, scoring_matrix: list, char_s: str, char_t: str):
+    return scoring_matrix[alphabet.index(char_s)][alphabet.index(char_t)]
 
-    return l[::-1]
+
+def needleman_wunsch(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shift: tuple):
+    nw_matrix = []
+    paths_matrix = []
+    for i in range(0, len(seq_s) + 1):
+        nw_matrix.append([])
+        paths_matrix.append([])
+        for j in range(0, len(seq_t) + 1):
+            if not i and not j:
+                val = 0
+                path_val = 'R'
+            elif not i:
+                val = nw_matrix[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                path_val = 'L'
+            elif not j:
+                val = nw_matrix[i-1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                path_val = 'U'
+            else:
+                diag = nw_matrix[i-1][j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
+                up = nw_matrix[i-1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                left = nw_matrix[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                val = max(diag, up, left)
+                path_val = ['D', 'U', 'L'][[diag, up, left].index(val)]
+            nw_matrix[i].append(val)
+            paths_matrix[i].append(path_val)
+    #
+    # print('NW MATRIX')
+    # for row in nw_matrix:
+    #     print(row)
+    # print('\nPATH MATRIX')
+    # for row in paths_matrix:
+    #     print(row)
+
+    # ---- BACKTRACK -----
+    i, j = len(seq_s), len(seq_t)
+    alignment_s, alignment_t = [], []
+
+    while True:  # while we haven't yet had to restart
+        path = paths_matrix[i][j]
+        if path == 'D':
+            alignment_s.append(shift[0] + i - 1)
+            alignment_t.append(shift[1] + j - 1)
+            i, j, = i - 1, j - 1
+        elif path == 'U':
+            i = i - 1
+        elif path == 'L':
+            j = j - 1
+        else:
+            break
+    alignment_s.reverse()
+    alignment_t.reverse()
+    for path in paths_matrix:
+        print(path)
+    return alignment_s, alignment_t
+
+# NW TEST
+# string_1, string_2 = "GATTACA", "GCATGCU"
+# c = needleman_wunsch('AGTCU_', [[1,-1,-1,-1,-1,-1],[-1,1,-1,-1,-1,-1],[-1,-1,1,-1,-1,-1],[-1,-1,-1,1,-1,-1],[-1,-1,-1,-1,1,-1], [-1,-1,-1,-1,-1,-1]], string_1, string_2 ,(0,0))
+# print(c)
+# # G_ATTACA
+# # GCA_TCGU
 
 
-ALPHABET = "ABC_"
-SCORING_MATRIX = np.array([
-    [1, -1, -2, -1],
-    [-1, 2, -4, -1],
-    [-2, -4, 3, -2],
-    [-1, -1, -2, 0]
-])
-s = "AABBAACA"
-t = "CBACCCBA"
+def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, shift: tuple):
+    alignment_s = ''
+    alignment_t = ''
+    print('Sequence S', seq_s)
+    print('Sequence T', seq_t)
 
-print(build_score_matrix(s, t))
 
-print(build_score_matrix(s, t, sublinear=True))
+    if not seq_s or not seq_t:
+        print("[], []")
+        return [], []
+    if len(seq_s) == 1 or len(seq_t) == 1:
+        print(needleman_wunsch(alphabet, scoring_matrix, seq_s, seq_t, shift))
+        return needleman_wunsch(alphabet, scoring_matrix, seq_s, seq_t, shift)
 
-print(heuralign(ALPHABET, SCORING_MATRIX,s, t))
+    def get_last_row(seq_1, seq_2):
+        row1, row2 = [], []
+        for i in range(0, len(seq_1) + 1):
+            if row2:
+                row1 = row2
+                row2 = []
+
+            for j in range(0, len(seq_2) + 1):
+                if not i and not j:
+                    row1.append(0)
+                elif not i:
+                    row1.append(row1[j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
+                elif not j:
+                    row2.append(row1[j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
+                else:
+                    # At this stage, we can assume we have completed row1 - we only append to row2
+                    diag = row1[j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
+                    up = row1[j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                    left = row2[j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                    val = max(diag, up, left)
+                    row2.append(val)
+        return row2
+
+    # split the first sequence in half
+    last_row_1 = get_last_row(seq_s[0:(len(seq_s)+1) // 2], seq_t)
+    print(seq_s[0:len(seq_s) // 2])
+    print(seq_s[len(seq_s) // 2:][::-1])
+    print('lr1', last_row_1)
+    last_row_2 = get_last_row(seq_s[(len(seq_s)+1) // 2:][::-1], seq_t[::-1])
+    print('lr2', last_row_2)
+
+    combined_rows = [x + y for x, y in zip(last_row_1, last_row_2[::-1])]  # sum the last rows
+    # print('sequence s', seq_s)
+    # print('sequence t', seq_t)
+    #
+    print(combined_rows)
+    max_index = combined_rows.index(max(combined_rows))
+    print('Aligned s', seq_s[-1])
+    print('Aligned t', seq_t[max_index])
+
+    print('len s', len(seq_s))
+    print('len t', len(seq_t))
+
+    h1_s_ind, h1_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[0:(len(seq_s)+1) // 2], seq_t[0:max_index+1], shift)
+    h2_s_ind, h2_t_ind = hirschberg(alphabet, scoring_matrix, seq_s[(len(seq_s)+1) // 2:], seq_t[max_index+1:],
+                                    (shift[0] + ((len(seq_s)+1) // 2), shift[1] + max_index+1))
+    print(h1_s_ind + h2_s_ind, h1_t_ind + h2_t_ind)
+    return h1_s_ind + h2_s_ind, h1_t_ind + h2_t_ind
+
+
+# b = hirschberg("AGTC_", [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]], "AGTACGCA", "TATGC", (0,0))
+# print(b)
+# b = hirschberg("AGTC_", [[2,-1,-1,-1,-1],[-1,2,-1,-1,-1],[-1,-1,2,-1,-1],[-1,-1,-1,2,-1],[-1,-1,-1,-1,0]], "ACTGACCT", "TGTCC", (0,0))
+# print(b)
+# string_1, string_2 = "GATTACA", "GCATGCU"
+# c = hirschberg('AGTCU_', [[1,-1,-1,-1,-1,-1],[-1,1,-1,-1,-1,-1],[-1,-1,1,-1,-1,-1],[-1,-1,-1,1,-1,-1],[-1,-1,-1,-1,1,-1], [-1,-1,-1,-1,-1,-1]], string_1, string_2 ,(0,0))
+# print(c)
+# G_ATTACA
+# GCA_TCGU
+# -----------------------------------------------------------------------
+
+
+def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
+    alphabet += '_'
+    high_score = -float('inf')
+    max_indices = None
+
+    # Compute scores
+    values, paths = [], []
+    for i in range(0, len(seq_s) + 1):
+        values.append([])
+        paths.append([])
+        for j in range(0, len(seq_t)+1):
+            path_val = ''
+
+            if not i and not j:
+                val = 0
+                path_val = 'R'
+            elif not i:
+                val = max(0, values[i][j-1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
+                if not val:
+                    path_val = 'R'
+                else:
+                    path_val = 'L'
+            elif not j:
+                val = max(0, values[i-1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
+                if not val:
+                    path_val = 'R'
+                else:
+                    path_val = 'U'
+            else:
+                diag = values[i-1][j-1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
+                up = values[i-1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                left = values[i][j-1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                val = max(0, diag, up, left)
+
+                if val == diag:
+                    path_val = 'D'
+                elif val == up:
+                    path_val = 'U'
+                elif val == left:
+                    path_val = 'L'
+                elif val == 0:
+                    path_val = 'R'
+
+            values[i].append(val)
+            paths[i].append(path_val)
+            if val > high_score:
+                high_score = val
+                max_indices = (i, j)
+
+    # ---- BACKTRACK -----
+    i, j = max_indices
+    alignment_s, alignment_t = [], []
+
+    while True:       # while we haven't yet had to restart
+        path = paths[i][j]
+        if path == 'D':
+            alignment_s.append(i-1)
+            alignment_t.append(j-1)
+            i, j, = i - 1, j - 1
+        elif path == 'U':
+            i = i - 1
+        elif path == 'L':
+            j = j - 1
+        else:
+            break
+
+    alignment_s.reverse()
+    alignment_t.reverse()
+    return [high_score, alignment_s, alignment_t]
+
+
+def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
+    alphabet += '_'
+
+    # Compute Smith-Waterman matrix scores using two columns at a time
+    def scan_matrix(seq_1, seq_2):
+        col1, col2 = [], []
+        high_score = -float('inf')
+        max_indices = None
+
+        for j in range(0, len(seq_2) + 1):
+            for i in range(0, len(seq_1) + 1):
+                if not i and not j:
+                    # Append 0 to col1
+                    val = 0
+                    col1.append(val)
+                elif not i:
+                    # Append value to col2
+                    val = max(0, col1[i] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
+                    col2.append(val)
+                elif not j:
+                    # Append value to col1
+                    val = max(0, col1[i - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
+                    col1.append(val)
+                else:
+                    # At this stage, we can assume we have completed col1 - we only append to col2
+                    diag = col1[i - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
+                    up = col2[i - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                    left = col1[i] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                    val = max(0, diag, up, left)
+                    col2.append(val)
+
+                if val > high_score:
+                    high_score = val
+                    max_indices = (i, j)
+            if col2:
+                # check col2 isn't empty first i.e. it isn't the first pass
+                col1 = col2
+                col2 = []
+        return max_indices, high_score
+
+    # -------------------------- Find the sub-sequences upon which to apply global alignment --------------------------
+    (i_index, j_index), high_score = scan_matrix(seq_s, seq_t)
+    seq_s, seq_t = seq_s[0:i_index][::-1], seq_t[0:j_index][::-1]
+    s_add, t_add = i_index, j_index
+    (i_index, j_index), _ = scan_matrix(seq_s, seq_t)
+    seq_s, seq_t = seq_s[0:i_index][::-1], seq_t[0:j_index][::-1]
+    s_add -= i_index        # s_add describes the value to add to indices of sequence s based on what has been removed
+    t_add -= j_index        # s_add describes the value to add to indices of sequence t based on what has been removed
+    print('s add', s_add)
+    print('t add', t_add)
+    # -----------------------------------------------------------------------------------------------------------------
+
+
+    alignment_s, alignment_t = hirschberg(alphabet, scoring_matrix, seq_s, seq_t, (s_add, t_add))
+
+
+    return [high_score, alignment_s, alignment_t]
+
+#put ALL your code here
+
+string_1, string_2 = "AABBAACA", "CBACCCBA"
+scoring_matrix = [[1,-1,-2,-1],[-1,2,-4,-1],[-2,-4,3,-2],[-1,-1,-2,0]]
+alphabet = "ABC"
+
+# a = dynprog ("ABC", scoring_matrix, string_1, string_2)
+# print("Score:   ", a[0])
+# print("Indices: ", a[1],a[2])
+# score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+# print('CHECKING SCORE: {} \n'.format(score))
+# recent_score = score
+#
+# a = dynproglin ("ABC", scoring_matrix, string_1, string_2)
+# print("Score:   ", a[0])
+# print("Indices: ", a[1],a[2])
+# score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+# print('CHECKING SCORE: {} \n'.format(score))
+# if score != recent_score:
+#     print(string_1 + ' and ' + string_2 + ' do not have matching alignments...')
+
+string_1, string_2 = "AACCDDAACC", "CADDACDDAA"
+scoring_matrix = [[ 1,-5,-5,-5,-1],[-5, 1,-5,-5,-1],[-5,-5, 5,-5,-4],[-5,-5,-5, 6,-4],[-1,-1,-4,-4,-9]]
+alphabet = "ABCD"
+
+a = dynprog (alphabet, scoring_matrix, string_1, string_2)
+print("Score:   ", a[0])
+print("Indices: ", a[1],a[2])
+score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+print('CHECKING SCORE: {} \n'.format(score))
+recent_score = score
+
+
+a = dynproglin (alphabet, scoring_matrix, string_1, string_2)
+print("Score:   ", a[0])
+print("Indices: ", a[1],a[2])
+score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
+print('CHECKING SCORE: {} \n'.format(score))
+if score != recent_score:
+    print(string_1 + ' and ' + string_2 + ' do not have matching alignments...')
+
