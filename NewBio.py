@@ -229,6 +229,19 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> l
     return [high_score, alignment_s, alignment_t]
 
 
+def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
+    ktup = 3
+    index_table = {}
+    # IF s length < ktup, we won't be able to find any seeds
+    if len(seq_s) < ktup:
+        pass
+    else:
+        for i in range(0, len(seq_s) - ktup):
+
+
+
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 
 # TESTS
