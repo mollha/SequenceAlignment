@@ -237,7 +237,7 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
         pass
     else:
         for i in range(0, len(seq_s) - ktup):
-
+            pass
 
 
 
