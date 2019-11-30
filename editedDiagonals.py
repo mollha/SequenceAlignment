@@ -31,34 +31,21 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
     return score
 
 def bandedSW(alphabet, scoring_matrix, seq_s, seq_t, diagonal: int, search_width):
-
-    # DONT NEED TO DO THIS ???
-    # Crop sequences around the diagonal
-    # If diff = 2, then (0, 2), (1, 3), (2, 4) etc until either i or j is at its max
-    # therefore (i = len(t) - diff, j = len(t))
-    # if diff = 0, then (0, 0), (1, 1) etc until both i and j are at their max
-    # If diff = -2, then (2, 0), (3, 1), (4, 2) etc until either i or j is at its max
-    # therefore (i = len(s), j = len(s) - diff)
     search_width = search_width // 2 # compute the search width on either side
     max_i_dir = min(len(seq_s), len(seq_t) - diagonal)
+
     max_j_dir = min(len(seq_t), len(seq_s) + diagonal)
 
     # We now want to traverse every row in this category
-    for i in range(0, max_i_dir):
-        print('i:', i)
-        # However, we only want to consider particular values of j
-        # These are the values surrounding the diagonal up to a maximum width <---x--->
-        # First, we need to calculate the "diff" in this row
-        # If diagonal is positive, this will be the right half of the grid, i.e. larger j than i
-        # This means that j = i + diagonal
-        # If this value is negative, it hasn't come onto the grid yet, we have to wait...
-        if i + diagonal < 0:
-            continue
-        # Otherwise, we just get going
+    for i in range(max(-diagonal, 0), max_i_dir):
+        print('i =', i)
+        print(seq_s[i])
         # Next, we need to compute the greatest value of j
         # It is the maximum as limited by the band, or by the width surrounding the band
         min_j_dir = max(0, i + diagonal - search_width)
-        for j in range(min_j_dir, max_j_dir):
+        for j in range(min_j_dir, min(i + diagonal + search_width + 1, max_j_dir)):
+            print('j =', j)
+            print(seq_t[j])
             pass
             # apply Smith Waterman Stuff here
 
@@ -242,87 +229,6 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> li
 
         return threshold
 
-    def extend(diagonals):
-        """
-        Given a dict of all seeds along the same diagonal, extend them if they lie upon the
-        same diagonal and return the new start-end indices
-        :param diagonals: dict, output of get_diagonals
-        :return: 2d arr of tuples, [[(start1, end1), (start2, end2)], ...]
-        """
-
-        # Calculate the expected score of any given string
-        threshold = get_threshold()
-
-        # Repeat until no more merges occur
-        while True:
-            # Exit condition -> no more merges have occured
-            flag = True
-
-            # Loop over every diagonal
-            for diagonal_id in diagonals:
-
-                # Get all subsequences that lie on that diagonal
-                seeds = diagonals[diagonal_id]
-                new_seeds = []
-                # If len(seeds) == 1 [no option to merge]
-                if len(seeds) == 1:
-                    new_seeds = seeds
-                else:
-                    # Loop over all seeds on the same diagonal
-                    for i in range(len(seeds) - 1):
-                        # Get subsequences between seeds & score it
-                        subseq1, subseq2 = seq_s[seeds[i][0][1]:seeds[i + 1][0][0]], \
-                                           seq_t[seeds[i][1][1]:seeds[i + 1][1][0]]
-                        score = 0
-                        for j in range(len(subseq1)):
-                            score += get_score(alphabet, scoring_matrix, subseq1[j], subseq2[j])
-
-                        # If score >= expected value -> merge
-                        if score >= threshold:
-                            s = [(seeds[i][0][0], seeds[i + 1][0][1]), (seeds[i][1][0], seeds[i + 1][1][1])]
-                            if s not in seeds:
-                                # print("Original {0} | {1}".format(seeds[i], seeds[i+1]))
-                                # print("Merged: {0}".format(s))
-                                new_seeds.append(s)
-                                flag = False
-                        else:
-                            new_seeds.append(seeds[i])
-                            if i == len(seeds) - 2:  # Add final seed into pool even if dont match
-                                new_seeds.append(seeds[i + 1])
-
-                # Update seeds to contain merges
-                diagonals[diagonal_id] = new_seeds
-
-            # If no merges have occured -> break
-            if flag:
-                break
-
-        return diagonals
-
-    def get_best(diagonals):
-        """
-        Given the (now merged diagonals), get the best n% of seeds.
-        :param diagonals: dict of seeds along same diagonals.
-        :return:
-        """
-        to_return = math.ceil(len(diagonals) * 0.1)
-        top_scores = []
-
-        for diagonal_id in diagonals:
-            for seed in diagonals[diagonal_id]:
-                seq1, seq2 = seq_s[seed[0][0]:seed[0][1]], seq_t[seed[1][0]:seed[1][1]]
-                score = 0
-                for i in range(len(seq1)):
-                    score += get_score(alphabet, scoring_matrix, seq_s[i], seq_t[i])
-                if len(top_scores) < to_return:
-                    top_scores.append([score, seed])
-                elif score > top_scores[-1][0]:
-                    del top_scores[-1]
-                    top_scores.append([score, seed])
-                # Sort in desc order by score
-                top_scores = sorted(top_scores, key=lambda x: x[0], reverse=True)
-        return [x[1] for x in top_scores]
-
     def banded_smith_waterman(best_seeds):
         """
         Run banded smith waterman with the width = avg distance between diagonals
@@ -464,54 +370,18 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> li
         diagonal_scores.sort(key=lambda x: x[0][0], reverse=True)
         diagonal_scores = diagonal_scores[0: min(3, len(diagonal_scores))]  # get top 3 diagonals
         diagonals = [x[1] for x in diagonal_scores]
+        for diff in diagonals:
+            print('Diff', diff)
+            bandedSW(alphabet, scoring_matrix, seq_s, seq_t, diff, 2)
     else:
         print("Sequences contain NO matching characters!!")
         # middle diagonal
-    print('HI')
-
-
-
-
-    # seeds = []
-    # while not seeds:
-    #     """
-    #     Given 2 sequences and the word_length param, find the start and ends for all matching subwords in seq2 that
-    #     are also in seq1 to make list of indexes of matching subwords
-    #     """
-    #     # Found words
-    #     words = []
-    #     # Get all words of length word_length and check if present in seq2
-    #     for i in range(0, len(seq_s) - word_length + 1):
-    #         # Get substring of word length
-    #         word = seq_t[i:i + word_length]
-    #         # Get start & end indexes of matches
-    #         matches = [(m.start(0), m.end(0)) for m in re.finditer(word, seq_t)]
-    #         if matches:
-    #             for match in matches:
-    #                 # Store in format (seq1 - start, end), (seq2 - start, end)
-    #                 words.append([(i, i + word_length), match])
-    #     seeds = words
-    #     if not seeds:
-    #         word_length -= 1
-    #         if word_length == 0:
-    #             print("Sequences contain NO matching characters!!")
-    #             return [0, [[], [], [], []]]
-    # print("Seeds: {0}".format(seeds))
-
-    # --- 2) Identify matching diagonals in seeds ---
-    diagonals = get_diagonals(seeds)
-    # print("Diagonals: {0}".format(diagonals))
-
-    # --- 3) Greedily extend words along diagonals if score of subsequence > threshold ---
-    diagonals = extend(diagonals)
-
-    # --- 4) Get top n% of seeds ---
-    best_seeds = get_best(diagonals)
+    print('----------- MY STUFF ENDS HERE ---------------')
 
     # --- 5) Run banded SmithWaterman (with width A) on best seed ---
-    results = banded_smith_waterman(best_seeds)
+    # results = banded_smith_waterman(best_seeds)
 
-    return results[0], results[1][0], results[1][1], results[1][2], results[1][3]
+    # return results[0], results[1][0], results[1][1], results[1][2], results[1][3]
 
 
 if __name__ == "__main__":
