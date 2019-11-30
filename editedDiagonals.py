@@ -1,5 +1,4 @@
 import helper_functions
-import re
 import numpy as np
 import math
 
@@ -31,30 +30,47 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         alignment_t = alignment_t[1:]
     return score
 
-def bandedSW(alphabet, scoring_matrix, seq_s, seq_t, diagonal, search_width):
+def bandedSW(alphabet, scoring_matrix, seq_s, seq_t, diagonal: int, search_width):
+
+    # DONT NEED TO DO THIS ???
     # Crop sequences around the diagonal
-    seq_s = seq_s[]
     # If diff = 2, then (0, 2), (1, 3), (2, 4) etc until either i or j is at its max
     # therefore (i = len(t) - diff, j = len(t))
     # if diff = 0, then (0, 0), (1, 1) etc until both i and j are at their max
     # If diff = -2, then (2, 0), (3, 1), (4, 2) etc until either i or j is at its max
     # therefore (i = len(s), j = len(s) - diff)
+    search_width = search_width // 2 # compute the search width on either side
+    max_i_dir = min(len(seq_s), len(seq_t) - diagonal)
+    max_j_dir = min(len(seq_t), len(seq_s) + diagonal)
+
+    # We now want to traverse every row in this category
+    for i in range(0, max_i_dir):
+        print('i:', i)
+        # However, we only want to consider particular values of j
+        # These are the values surrounding the diagonal up to a maximum width <---x--->
+        # First, we need to calculate the "diff" in this row
+        # If diagonal is positive, this will be the right half of the grid, i.e. larger j than i
+        # This means that j = i + diagonal
+        # If this value is negative, it hasn't come onto the grid yet, we have to wait...
+        if i + diagonal < 0:
+            continue
+        # Otherwise, we just get going
+        # Next, we need to compute the greatest value of j
+        # It is the maximum as limited by the band, or by the width surrounding the band
+        min_j_dir = max(0, i + diagonal - search_width)
+        for j in range(min_j_dir, max_j_dir):
+            pass
+            # apply Smith Waterman Stuff here
+
+    # ---------------------------------------------------
+
+
+
+
 
 
 class BandedSmithWaterman:
     def __init__(self, seq1, seq2, scoring_matrix, alphabet, width, seed):
-        # Scores of pairings
-        self.scoring_matrix = scoring_matrix
-
-        # Set of unique characters (same order as in scoring matrix)
-        self.alphabet = alphabet
-
-        # Width to explore
-        self.width = width
-
-        # Seed of interest (ungapped alignment (s1, e1). (s2, e2))
-        self.seed = seed
-
         # Create region for checking whether inside/outside region
         self.region = self.create_region_set(seed, seq1, seq2)
 
@@ -444,10 +460,10 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> li
         diagonals = get_diagonals(seeds)
         diagonal_scores = []
         for diagonal_key in diagonals:
-            diagonal_scores.append(extend_diagonal(diagonals[diagonal_key]))
-        diagonal_scores.sort(key=lambda x: x[0], reverse=True)
+            diagonal_scores.append((extend_diagonal(diagonals[diagonal_key]), diagonal_key))
+        diagonal_scores.sort(key=lambda x: x[0][0], reverse=True)
         diagonal_scores = diagonal_scores[0: min(3, len(diagonal_scores))]  # get top 3 diagonals
-        print(diagonal_scores)
+        diagonals = [x[1] for x in diagonal_scores]
     else:
         print("Sequences contain NO matching characters!!")
         # middle diagonal
