@@ -51,7 +51,6 @@ def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
 def backtrack(paths: list, max_indices: tuple) -> tuple:
     i, j = max_indices
     alignment_s, alignment_t = [], []
-    # TODO issue with backtracking function
 
     while True:
         path = paths[i][j]

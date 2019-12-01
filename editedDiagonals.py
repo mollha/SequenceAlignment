@@ -10,6 +10,26 @@ They should output three items: the score of the best local alignment found by t
 one for each input sequences, that realise the matches/mismatches in the alignment.
 """
 
+def backtrack(paths: list, max_indices: tuple) -> tuple:
+    i, j = max_indices
+    alignment_s, alignment_t = [], []
+
+    while True:
+        path = paths[i][j]
+        if path == 'D':
+            alignment_s.append(i - 1)
+            alignment_t.append(j - 1)
+            i, j, = i - 1, j - 1
+        elif path == 'U':
+            i = i - 1
+        elif path == 'L':
+            j = j - 1
+        else:
+            break
+    alignment_s.reverse()
+    alignment_t.reverse()
+    return alignment_s, alignment_t
+
 def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
     alpha += '_'
     return scoring[alpha.index(char_s)][alpha.index(char_t)]
@@ -30,24 +50,160 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         alignment_t = alignment_t[1:]
     return score
 
+def bandedSmW(alphabet, scoring_matrix, seq_s, seq_t, diagonal: int, search_width):
+    # crop sequence s, but not sequence t
+    seq_s = seq_s[max(-diagonal, 0): min(len(seq_s), len(seq_t) - diagonal)]
+    high_score = -float('inf')
+    max_indices = None
+    values, paths = [], []
+
+    for i in range(len(seq_s)):
+        values.append([])
+        paths.append([])
+        # diagonal position of j is the i position + starting i position + (or -) the diagonal shift
+        diagonal_j = i + max(-diagonal, 0) + diagonal
+        for j in range(diagonal_j - search_width, min(diagonal_j + search_width + 1, len(seq_t))):
+            print('i: ', i)
+            print('j: ', j)
+            path_val = ''
+            if (not i and not j) or j < 0:
+                # if we're in the top right cell or in a non-grid cell
+                val = 0
+                path_val = 'R'
+            elif not i:
+                # left is [i][j - 1]
+                val = max(0, values[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
+                if not val:
+                    path_val = 'R'
+                else:
+                    path_val = 'L'
+            elif not j:
+                # # up is now [i - 1][j]
+                val = max(0, values[i - 1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
+                if not val:
+                    path_val = 'R'
+                else:
+                    path_val = 'U'
+            else:
+                for row in values:
+                    print(row)
+                # [i - 1][j] is now diagonal
+                print('i: ', i)
+                print('char s', seq_s[i - 1])
+                print('j: ', j)
+                print('char t', seq_t[j - 1])
+                grid_j = len(values[i])
+                diag = values[i - 1][grid_j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
+                up = values[i - 1][grid_j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                left = 0 if not values[i] else values[i][grid_j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                val = max(0, diag, up, left)
+
+                if val == diag:
+                    path_val = 'D'
+                elif val == up:
+                    path_val = 'U'
+                elif val == left:
+                    path_val = 'L'
+                elif val == 0:
+                    path_val = 'R'
+            values[i].append(val)
+            paths[i].append(path_val)
+
+            if val > high_score:
+                high_score = val
+                max_indices = (i, j)
+
+    print('-----')
+    for row in values:
+        print(row)
+    for path in paths:
+        print(path)
+    print(max_indices)
+
+
+    # apply Smith Waterman Stuff here
+    # now we are looking at shifted rows
+
+    alignment_s, alignment_t = backtrack(paths, max_indices)
+    return [high_score, alignment_s, alignment_t]
+
+
+
+
 def bandedSW(alphabet, scoring_matrix, seq_s, seq_t, diagonal: int, search_width):
-    search_width = search_width // 2 # compute the search width on either side
-    max_i_dir = min(len(seq_s), len(seq_t) - diagonal)
+    # search_width is the search width on either side
+    #seq_s = seq_s[max(-diagonal, 0):min(len(seq_s), len(seq_t) - diagonal)]
+     # seq_t = seq_t[0: min(len(seq_t), len(seq_s) + diagonal)]
+    print('Seq s', seq_s)
+    print('Seq t', seq_t)
+
+    high_score = -float('inf')
+    max_indices = None
+    values, paths = [], []
 
     max_j_dir = min(len(seq_t), len(seq_s) + diagonal)
+    print('max j', max_j_dir)
 
     # We now want to traverse every row in this category
-    for i in range(max(-diagonal, 0), max_i_dir):
+    for i in range(len(seq_s)):
         print('i =', i)
-        print(seq_s[i])
+        values.append([])
+        paths.append([])
         # Next, we need to compute the greatest value of j
         # It is the maximum as limited by the band, or by the width surrounding the band
         min_j_dir = max(0, i + diagonal - search_width)
         for j in range(min_j_dir, min(i + diagonal + search_width + 1, max_j_dir)):
+            print('search wide', min(i + diagonal + search_width + 1, max_j_dir))
+            path_val = ''
             print('j =', j)
             print(seq_t[j])
-            pass
+            grid_index_j = j - min_j_dir
+            grid_index_i = i - max(-diagonal, 0)
+            if not grid_index_i and not grid_index_j:
+                # if we're in the top right cell
+                val = 0
+                path_val = 'R'
+            elif not i:
+                # left is [i][j - 1]
+                val = max(0, values[grid_index_i][grid_index_j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
+                if not val:
+                    path_val = 'R'
+                else:
+                    path_val = 'L'
+            elif not grid_index_j:
+                # # up is now [i - 1][j]
+                val = max(0, values[grid_index_i - 1][grid_index_j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
+                if not val:
+                    path_val = 'R'
+                else:
+                    path_val = 'U'
+            else:
+                # [i - 1][j] is now diagonal
+                diag = values[grid_index_i - 1][grid_index_j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
+                up = values[grid_index_i - 1][grid_index_j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                left = values[grid_index_i][grid_index_j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                val = max(0, diag, up, left)
+
+                if val == diag:
+                    path_val = 'D'
+                elif val == up:
+                    path_val = 'U'
+                elif val == left:
+                    path_val = 'L'
+                elif val == 0:
+                    path_val = 'R'
+
+            values[grid_index_i].append(val)
+            paths[grid_index_j].append(path_val)
+            if val > high_score:
+                high_score = val
+                max_indices = (i, j)
+
             # apply Smith Waterman Stuff here
+            # now we are looking at shifted rows
+    print(values)
+    alignment_s, alignment_t = backtrack(paths, max_indices)
+    return [high_score, alignment_s, alignment_t]
 
     # ---------------------------------------------------
 
@@ -372,7 +528,7 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> li
         diagonals = [x[1] for x in diagonal_scores]
         for diff in diagonals:
             print('Diff', diff)
-            bandedSW(alphabet, scoring_matrix, seq_s, seq_t, diff, 2)
+            bandedSmW(alphabet, scoring_matrix, seq_s, seq_t, diff, 3)
     else:
         print("Sequences contain NO matching characters!!")
         # middle diagonal
@@ -414,7 +570,7 @@ if __name__ == "__main__":
     alphabet = "ABCD"
     scoring_matrix = [
         [1, -5, -5, -5, -1],
-        [-5, -1, -5, -5, -1],
+        [-5, 1, -5, -5, -1],
         [-5, -5, 5, -5, -4],
         [-5, -5, -5, 6, -4],
         [-1, -1, -4, -4, -9]]
