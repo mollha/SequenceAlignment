@@ -1,7 +1,6 @@
 import helper_functions
 import re
 import numpy as np
-import math
 
 def backtrack(paths: list, max_indices: tuple) -> tuple:
     i, j = max_indices
@@ -402,7 +401,7 @@ class FASTA:
         # b) Some fixed value (can lead to O(n^2) with len(seqs) << value
         # w2 = 20
         # c) % of minimum sequence length (will always ensure < O(n^2))
-        w3 = math.ceil(min([len(self.seq1), len(self.seq2)]) * 0.95)
+        w3 = int(-min([len(self.seq1), len(self.seq2)]) // (20/19))
         # Current Policy: take max of a) & c) for width to use
         # c) works best when len(a) ~= len(b) && a) works best when len(a) !~= len(b)
         width = max(w1, w3)
