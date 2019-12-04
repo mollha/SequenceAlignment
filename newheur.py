@@ -35,8 +35,6 @@ def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
     alpha += '_'
     return scoring[alpha.index(char_s)][alpha.index(char_t)]
 
-
-
 def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t):
     score = 0
     sequence_s = ''
@@ -222,70 +220,6 @@ class BandedSmithWaterman:
         # Return max score and best local alignment chars + indices
         return [max_score, helper_functions.backtrack(self.backtrack_matrix, max_index, self.seq1, self.seq2)]
 
-def banded_smith_waterman(alphabet, scoring_matrix, seq_s, seq_t, diagonal: int, search_width) -> tuple:
-    high_score = -float('inf')
-    max_indices = None
-    values, paths = [], []
-    j_pairs = {}
-
-    for i in range(max(-diagonal, 0), min(len(seq_s), len(seq_t) - diagonal)):
-        values.append([])
-        paths.append([])
-        grid_i = i - max(-diagonal, 0)
-        for j in range(i + diagonal - search_width, min(i + diagonal + search_width + 1, len(seq_t))):
-            grid_j = len(values[grid_i])
-            path_val = ''
-
-            if (not grid_i and not grid_j) or j < 0:
-                val = 0
-                path_val = 'R'
-            elif not grid_i:
-                val = max(0, values[grid_i][grid_j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
-                if not val:
-                    path_val = 'R'
-                else:
-                    path_val = 'L'
-            elif not grid_j:
-                # # up is now [i - 1][j]
-                val = max(0, values[grid_i - 1][grid_j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
-                if not val:
-                    path_val = 'R'
-                else:
-                    path_val = 'U'
-            else:
-                # [i - 1][j] is now diagonal
-                diag = values[grid_i - 1][grid_j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
-                up = values[grid_i - 1][grid_j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
-                left = 0 if not values[grid_i] else values[grid_i][grid_j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
-                val = max(0, diag, up, left)
-
-                if val == diag:
-                    path_val = 'D'
-                    j_pairs[i] = j
-                elif val == up:
-                    path_val = 'U'
-                elif val == left:
-                    path_val = 'L'
-                elif val == 0:
-                    path_val = 'R'
-            values[grid_i].append(val)
-            paths[grid_i].append(path_val)
-
-            if val > high_score:
-                high_score = val
-                max_indices = (grid_i, grid_j)
-
-    print('-----')
-    for row in values:
-        print(row)
-    for path in paths:
-        print(path)
-
-    alignment_s, alignment_t = backtrack(paths, max_indices)
-    alignment_s = [i - max(-diagonal, 0) for i in alignment_s]
-    alignment_t = [j_pairs[i] + i + diagonal for i in alignment_s]
-    return high_score, alignment_s, alignment_t
-
 
 def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tuple:
     band_width = 3
@@ -384,25 +318,31 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tu
 
     # if there are NO seeds, then just choose the middle diagonal
     if not seeds:
-        return banded_smith_waterman(alphabet, scoring_matrix, seq_s, seq_t, 0, band_width)
+        BSW = BandedSmithWaterman(seq_s, seq_t, scoring_matrix, alphabet, band_width, [(0, 0)])
+        return BSW.align()
 
     diagonals = get_diagonals(seeds)
     diagonal_scores = []
-    for diagonal_key in diagonals:
-        diagonal_scores.append((extend_diagonal(diagonals[diagonal_key]), diagonal_key))
-    diagonal_scores.sort(key=lambda x: x[0][0], reverse=True)
-    diagonal_scores = diagonal_scores[0: min(3, len(diagonal_scores))]  # get top 3 diagonals
-    diagonals = [x[1] for x in diagonal_scores]
     print(diagonals)
+    for diagonal_key in diagonals:
+        diagonal_scores.append(extend_diagonal(diagonals[diagonal_key]))
+    diagonal_scores.sort(key=lambda x: x[0], reverse=True)
+    diagonal_scores = diagonal_scores[0: min(3, len(diagonal_scores))]  # get top 3 diagonals
+    diagonal_scores = [x[1] for x in diagonal_scores]
+
     highest_score = float('-inf')
     best_alignment = None
-    for diff in diagonals:
-        print('Diff', diff)
-        diff_score, alignment_s, alignment_t = banded_smith_waterman(alphabet, scoring_matrix, seq_s, seq_t, diff, band_width)
+
+    for diagonal_line in diagonal_scores:
+        first_seed = diagonal_line[0]
+        BSW = BandedSmithWaterman(seq_s, seq_t, scoring_matrix, alphabet, band_width, [(first_seed[0], first_seed[0] + first_seed[3]), (first_seed[1], first_seed[1] + first_seed[3])])
+        diff_score, alignments = BSW.align()
+        print(BSW.align())
+        print(alignments)
+        alignment_s, alignment_t, _, _ = alignments
         if diff_score > highest_score:
             best_alignment = diff_score, alignment_s, alignment_t
     return best_alignment
-
 
 
 if __name__ == "__main__":
@@ -442,8 +382,8 @@ if __name__ == "__main__":
     x = 5
     sequence1 = "".join(choice(list(alphabet)) for i in range(x))
     sequence2 = "".join(choice(list(alphabet)) for i in range(x))
-    sequence1 = "ACABA"
-    sequence2 = "CDABD"
+    sequence1 = "AACAAADAAAACAADAADAAA"
+    sequence2 = "CDCDAAACCACACAAAADD"
 
     print("Starting:")
     # Strip to ensure no whitespace
@@ -452,7 +392,6 @@ if __name__ == "__main__":
     print("Seq 2 - {0}".format(sequence2))
     print("------------")
 
-    # TODO: improve runtime of scoring by using dicts!
 
     #  Part 3 - < O(n^2) heuristic procedure, similar to FASTA and BLAST (time)
     score, out1_indices, out2_indices = heuralign(alphabet, scoring_matrix, sequence1, sequence2)
