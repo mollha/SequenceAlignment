@@ -196,6 +196,9 @@ def banded_SW(alphabet, scoring_matrix, seq1, seq2, width, seed):
     alignment_s, alignment_t = backtrack(backtrack_matrix, max_index)
     return max_score, alignment_s, alignment_t
 
+def FASTA_Stuff(alphabet, scoring_matrix, seq1, seq2, width, seed):
+    pass
+
 class FASTA:
     """
     3) Heuristic procedure that runs in sub-quadratic time (similar to FASTA and BLAST) [up to 85 marks].
