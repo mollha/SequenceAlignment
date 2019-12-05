@@ -139,19 +139,16 @@ def banded_SW(alphabet, scoring_matrix, seq1, seq2, width, seed):
 
     # initialises cost and backtrack (paths) matrix here
 
-    def in_region(val_1, val_2):
-        return (val_1, val_2) in region
-
-    cost_matrix = [[None for _ in range(len(seq1) + 1)] for _ in range(len(seq2) + 1)]
-    backtrack_matrix = [[None for _ in range(len(cost_matrix[0]))] for _ in range(len(cost_matrix))]
+    values = [[0 for _ in range(len(seq1) + 1)] for _ in range(len(seq2) + 1)]
+    backtrack_matrix = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
     backtrack_matrix[0] = ['L' for _ in range(len(backtrack_matrix[0]))]
     for i in range(len(backtrack_matrix)):
         backtrack_matrix[i][0] = 'U'
     # Set 0,0 to None (always terminate here)
     backtrack_matrix[0][0] = None
-    cost_matrix[0] = [0 for _ in range(len(cost_matrix[0]))]
-    for i in range(len(cost_matrix)):
-        cost_matrix[i][0] = 0
+    values[0] = [0 for _ in range(len(values[0]))]
+    for i in range(len(values)):
+        values[i][0] = 0
 
     # Max score tracker
     max_score = -float('inf')
@@ -163,26 +160,26 @@ def banded_SW(alphabet, scoring_matrix, seq1, seq2, width, seed):
         flag = False
         for x in range(1, len(seq1) + 1):  # x -> seq1
             # Check if current scoring cell lies in diagonal
-            if in_region(x + seq1_offset, y + seq2_offset):
+            if (x + seq1_offset, y + seq2_offset) in region:
                 # Set flag (as reached banded region)
                 flag = True
                 # If in diagonal, score as normal (cell not in diagonal all have score = 0)
                 vals = [
                     # seq2[y-1], seq1[x-1] as matrix has empty row & col at start
-                    cost_matrix[y - 1][x - 1] + get_score(alphabet, scoring_matrix, seq2[y - 1], seq1[x - 1]),  # diagonal
-                    cost_matrix[y - 1][x] + get_score(alphabet, scoring_matrix, seq2[y - 1], '_'),  # up
-                    cost_matrix[y][x - 1] + get_score(alphabet, scoring_matrix, '_', seq1[x - 1]),  # left
+                    values[y - 1][x - 1] + get_score(alphabet, scoring_matrix, seq2[y - 1], seq1[x - 1]),  # diagonal
+                    values[y - 1][x] + get_score(alphabet, scoring_matrix, seq2[y - 1], '_'),  # up
+                    values[y][x - 1] + get_score(alphabet, scoring_matrix, '_', seq1[x - 1]),  # left
                     0]  # 0 for local alignment
                 # Update scoring matrix
-                cost_matrix[y][x] = max(vals)
+                values[y][x] = max(vals)
                 # Get index of max
                 index = vals.index(max(vals))
                 # Update backtrack matrix if score it come from is a valid cell
-                if index == 0 and in_region(x - 1 + seq1_offset, y - 1 + seq2_offset):
+                if index == 0 and (x - 1 + seq1_offset, y - 1 + seq2_offset) in region:
                     backtrack_matrix[y][x] = 'D'
-                elif index == 1 and in_region(x + seq1_offset, y - 1 + seq2_offset):
+                elif index == 1 and (x + seq1_offset, y - 1 + seq2_offset) in region:
                     backtrack_matrix[y][x] = 'U'
-                elif index == 2 and in_region(x - 1 + seq1_offset, y + seq2_offset):
+                elif index == 2 and (x - 1 + seq1_offset, y + seq2_offset) in region:
                     backtrack_matrix[y][x] = 'L'
                 # Check if new greatest score seen (score for vals outside diagonals score = 0)
                 if max(vals) > max_score:
@@ -190,7 +187,7 @@ def banded_SW(alphabet, scoring_matrix, seq1, seq2, width, seed):
                     max_index = [y, x]
             else:
                 # If cell doesn't lie in diagonal -> score = 0 (local alignment still)
-                cost_matrix[y][x] = 0
+                values[y][x] = 0
                 # If flag = True, have passed over banded region and back into region outside of band -> can break
                 if flag:
                     break
@@ -222,10 +219,10 @@ class FASTA:
         # self.word_length = 3
 
         # Setup cost matrix
-        self.cost_matrix = helper_functions.create_cost_matrix(seq1, seq2)
+        self.values = helper_functions.create_cost_matrix(seq1, seq2)
 
         # Setup both backtrack and cost matrix initial values
-        self.cost_matrix, self.backtrack_matrix = helper_functions.matrix_setup(self.cost_matrix, local=True,
+        self.values, self.backtrack_matrix = helper_functions.matrix_setup(self.values, local=True,
                                                                                 scoring_matrix=self.scoring_matrix,
                                                                                 alphabet=self.alphabet,
                                                                                 seq1=self.seq1,
@@ -379,19 +376,6 @@ class FASTA:
         :param best_seeds: 2d arr of (start, end) indices for best seeds
         :return: results for FASTA
         """
-        # --- 1) Calculate average distance between diagonals as banded region to search in --
-        # # a) Avg distance between diagonals of best seeds (or word length if only one seed)
-        # if len(best_seeds) == 1:
-        #     width = self.word_length  # (max 1.5% of length of shortest sequence)
-        # else:
-        #     avg_width = []
-        #     for i in range(len(best_seeds)-1):
-        #         i_diag = best_seeds[i][0][0] - best_seeds[i][1][0]
-        #         for j in range(i+1, len(best_seeds)):
-        #             j_diag = best_seeds[j][0][0] - best_seeds[j][1][0]
-        #             avg_width.append(abs(i_diag - j_diag))
-        #     width = math.ceil(sum(avg_width)/len(avg_width))
-        # b) Fixed width
         width = 32
 
         # --- 2) Run BandedSmithWaterman on each pair using the found average distance between diagonals ---
@@ -440,32 +424,6 @@ def heuralign(alphabet, scoring_matrix, sequence1, sequence2):
 
 
 if __name__ == "__main__":
-    # # Debug input 1
-    # alphabet = "ABC"
-    # scoring_matrix = [[1, -1, -2, -1], [-1, 2, -4, -1], [-2, -4, 3, -2], [-1, -1, -2, 0]]
-    # sequence1 = "AABBAACA"
-    # sequence2 = "CBACCCBA"
-    # # Debug input 2
-    # alphabet = "ABCD"
-    # scoring_matrix = [
-    #         [ 1,-5,-5,-5,-1],
-    #         [-5, 1,-5,-5,-1],
-    #         [-5,-5, 5,-5,-4],
-    #         [-5,-5,-5, 6,-4],
-    #         [-1,-1,-4,-4,-9]]
-    # sequence1 = "AAAAACCDDCCDDAAAAACC"
-    # sequence2 = "CCAAADDAAAACCAAADDCCAAAA"
-    # # Debug input 3
-    # alphabet = "ABCD"
-    # scoring_matrix = [
-    #         [ 1,-5,-5,-5,-1],
-    #         [-5, 1,-5,-5,-1],
-    #         [-5,-5, 5,-5,-4],
-    #         [-5,-5,-5, 6,-4],
-    #         [-1,-1,-4,-4,-9]]
-    # sequence1 = "AACAAADAAAACAADAADAAA"
-    # sequence2 = "CDCDDD"
-    # Debug input 4
     alphabet = "ABCD"
     scoring_matrix = [
             [ 1,-5,-5,-5,-1],
