@@ -23,43 +23,6 @@ def backtrack(paths: list, max_indices: tuple) -> tuple:
     alignment_t.reverse()
     return alignment_s, alignment_t
 
-# def backtrack(backtrack_matrix, index, seq1, seq2):
-#     """
-#     Iterate over max_indexes and find all best local alignments
-#     :param backtrack_matrix: backtrack matrix
-#     :param index: arr of y, x coor of starting point for max alignment
-#     :return: 2d arr of all alignments
-#     """
-#     # Start at max index & backtrack
-#     out1_chars, out2_chars = [], []
-#     out1_indices, out2_indices = [], []
-#     # Stored as [y, x]
-#     x = index[1]
-#     y = index[0]
-#
-#     # NB: seq1[x-1] & seq2[y-1] as backtrack & scoring matrix len = len(seq) + 1 (empty @ beginning)
-#     while backtrack_matrix[y][x] is not None and x >= 0 and y >= 0:
-#         if backtrack_matrix[y][x] == 'D':
-#             out1_chars.append(seq1[x-1])
-#             out2_chars.append(seq2[y-1])
-#             # Add indices of matches to output
-#             out1_indices.append(x-1)
-#             out2_indices.append(y-1)
-#             x -= 1
-#             y -= 1
-#         elif backtrack_matrix[y][x] == 'L':
-#             out1_chars.append(seq1[x - 1])
-#             out2_chars.append('_')
-#             x -= 1
-#         else:
-#             out1_chars.append('_')
-#             out2_chars.append(seq2[y - 1])
-#             y -= 1
-#
-#     # Return alignment -> indices1, indices2, chars1, chars2
-#     return list(reversed(out1_indices)), list(reversed(out2_indices)),  list(reversed(out1_chars)), list(reversed(out2_chars))
-
-
 def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
     alpha += '_'
     return scoring[alpha.index(char_s)][alpha.index(char_t)]
@@ -86,8 +49,6 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         sequence_t += seq_t[alignment_t[0]]
         alignment_s = alignment_s[1:]
         alignment_t = alignment_t[1:]
-    print(sequence_s)
-    print(sequence_t)
     return score
 
 """
@@ -98,7 +59,7 @@ They should output three items: the score of the best local alignment found by t
 one for each input sequences, that realise the matches/mismatches in the alignment.
 """
 
-def banded_SW(alphabet, scoring_matrix, seq1, seq2, width, seed):
+def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, width, seed):
     # Set to store all (x, y) coors of valid regions in the grid
     region = set()
     # Iterate up + left add all along diagonal + any width away to set
@@ -106,40 +67,40 @@ def banded_SW(alphabet, scoring_matrix, seq1, seq2, width, seed):
     while x >= 0 and y >= 0:
         for i in range(-width, width + 1):
             for j in range(-width, width + 1):
-                if 0 <= x + i < len(seq1) and 0 <= y + j < len(seq2):
+                if 0 <= x + i < len(seq_s) and 0 <= y + j < len(seq_t):
                     region.add((x + i, y + j))
         x -= 1
         y -= 1
     # Iterate down + right add all along diagonal + any width away to set
     x, y = seed[0][0] + 1, seed[1][0] + 1
 
-    while x < len(seq1) and y < len(seq2):
+    while x < len(seq_s) and y < len(seq_t):
         for i in range(-width, width + 1):
             for j in range(-width, width + 1):
-                if 0 <= x + i < len(seq1) and 0 <= y + j < len(seq2):
+                if 0 <= x + i < len(seq_s) and 0 <= y + j < len(seq_t):
                     region.add((x + i, y + j))
         x += 1
         y += 1
 
     # region has been created
-    x, y = seed[0][0], seed[1][0]  # seq1 -> x, seq2 -> y
+    x, y = seed[0][0], seed[1][0]  # seq_s -> x, seq_t -> y
     x_intercept, y_intercept = x - min(x, y), y - min(x, y)
     # Banded region is width space away from cells on diagonal in dirs: left, right, up, down (that exist)
-    # Get starts of seq1 & seq2 (leftmost cell and topmost cell)
-    seq1_start = max(0, x_intercept - width)
-    seq2_start = max(0, y_intercept - width)
-    # Get ends of seq1 & seq2 (rightmost and bottommost cell)
-    seq1_end = len(seq1) - seq2_start
-    seq2_end = len(seq2) - seq1_start
+    # Get starts of seq_s & seq_t (leftmost cell and topmost cell)
+    seq_s_start = max(0, x_intercept - width)
+    seq_t_start = max(0, y_intercept - width)
+    # Get ends of seq_s & seq_t (rightmost and bottommost cell)
+    seq_s_end = len(seq_s) - seq_t_start
+    seq_t_end = len(seq_t) - seq_s_start
 
-    seq1 = seq1[seq1_start:seq1_end]
-    seq2 = seq2[seq2_start:seq2_end]
-    seq1_offset = seq1_start
-    seq2_offset = seq2_start
+    seq_s = seq_s[seq_s_start:seq_s_end]
+    seq_t = seq_t[seq_t_start:seq_t_end]
+    seq_s_offset = seq_s_start
+    seq_t_offset = seq_t_start
 
     # initialises cost and backtrack (paths) matrix here
 
-    values = [[0 for _ in range(len(seq1) + 1)] for _ in range(len(seq2) + 1)]
+    values = [[0 for _ in range(len(seq_s) + 1)] for _ in range(len(seq_t) + 1)]
     backtrack_matrix = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
     backtrack_matrix[0] = ['L' for _ in range(len(backtrack_matrix[0]))]
     for i in range(len(backtrack_matrix)):
@@ -155,31 +116,31 @@ def banded_SW(alphabet, scoring_matrix, seq1, seq2, width, seed):
     max_index = [0, 0]  # init to 0,0 (0 score)
 
     # Iterate over scoring matrix and generate scoring (start at 1,1 and work from there)
-    for y in range(1, len(seq2) + 1):  # y -> seq2
+    for y in range(1, len(seq_t) + 1):  # y -> seq_t
         # Break flag -> set true once in banded region, then if out -> can break (as dont need to consider further)
         flag = False
-        for x in range(1, len(seq1) + 1):  # x -> seq1
+        for x in range(1, len(seq_s) + 1):  # x -> seq_s
             # Check if current scoring cell lies in diagonal
-            if (x + seq1_offset, y + seq2_offset) in region:
+            if (x + seq_s_offset, y + seq_t_offset) in region:
                 # Set flag (as reached banded region)
                 flag = True
                 # If in diagonal, score as normal (cell not in diagonal all have score = 0)
                 vals = [
-                    # seq2[y-1], seq1[x-1] as matrix has empty row & col at start
-                    values[y - 1][x - 1] + get_score(alphabet, scoring_matrix, seq2[y - 1], seq1[x - 1]),  # diagonal
-                    values[y - 1][x] + get_score(alphabet, scoring_matrix, seq2[y - 1], '_'),  # up
-                    values[y][x - 1] + get_score(alphabet, scoring_matrix, '_', seq1[x - 1]),  # left
+                    # seq_t[y-1], seq_s[x-1] as matrix has empty row & col at start
+                    values[y - 1][x - 1] + get_score(alphabet, scoring_matrix, seq_t[y - 1], seq_s[x - 1]),  # diagonal
+                    values[y - 1][x] + get_score(alphabet, scoring_matrix, seq_t[y - 1], '_'),  # up
+                    values[y][x - 1] + get_score(alphabet, scoring_matrix, '_', seq_s[x - 1]),  # left
                     0]  # 0 for local alignment
                 # Update scoring matrix
                 values[y][x] = max(vals)
                 # Get index of max
                 index = vals.index(max(vals))
                 # Update backtrack matrix if score it come from is a valid cell
-                if index == 0 and (x - 1 + seq1_offset, y - 1 + seq2_offset) in region:
+                if index == 0 and (x - 1 + seq_s_offset, y - 1 + seq_t_offset) in region:
                     backtrack_matrix[y][x] = 'D'
-                elif index == 1 and (x + seq1_offset, y - 1 + seq2_offset) in region:
+                elif index == 1 and (x + seq_s_offset, y - 1 + seq_t_offset) in region:
                     backtrack_matrix[y][x] = 'U'
-                elif index == 2 and (x - 1 + seq1_offset, y + seq2_offset) in region:
+                elif index == 2 and (x - 1 + seq_s_offset, y + seq_t_offset) in region:
                     backtrack_matrix[y][x] = 'L'
                 # Check if new greatest score seen (score for vals outside diagonals score = 0)
                 if max(vals) > max_score:
@@ -194,92 +155,27 @@ def banded_SW(alphabet, scoring_matrix, seq1, seq2, width, seed):
     alignment_s, alignment_t = backtrack(backtrack_matrix, max_index)
     return max_score, alignment_s, alignment_t
 
-class FASTA:
+
+def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
     """
     3) Heuristic procedure that runs in sub-quadratic time (similar to FASTA and BLAST) [up to 85 marks].
     - for local alignment
-    :param seq1: sequence of chars, str
-    :param seq2: sequence of chars, str
+    :param seq_s: sequence of chars, str
+    :param seq_t: sequence of chars, str
     :return: 2 arr's of each chars alignment
     """
+    word_length = max(3, math.ceil(min(len(seq_s), len(seq_t)) * 0.015))
 
-    def __init__(self, seq1, seq2, scoring_matrix, alphabet):
-        # Calculating score of pairings
-        self.scoring_matrix = scoring_matrix
-
-        # Set of unique characters (same order as in scoring matrix)
-        self.alphabet = alphabet
-
-        # Sequences
-        self.seq1 = seq1
-        self.seq2 = seq2
-
-        # Word length
-        self.word_length = max(3, math.ceil(min(len(self.seq1), len(self.seq2)) * 0.015))
-        # self.word_length = 3
-
-        # Setup cost matrix
-        self.values = helper_functions.create_cost_matrix(seq1, seq2)
-
-        # Setup both backtrack and cost matrix initial values
-        self.values, self.backtrack_matrix = helper_functions.matrix_setup(self.values, local=True,
-                                                                                scoring_matrix=self.scoring_matrix,
-                                                                                alphabet=self.alphabet,
-                                                                                seq1=self.seq1,
-                                                                                seq2=self.seq2)
-
-    def seed(self, seq1, seq2):
-        """
-        Given 2 sequences and the word_length param, find the start and ends for all matching subwords in seq2 that
-        are also in seq1
-        :param seq1: str, seq1
-        :param seq2: str, seq2
-        :return: list of indexes of matching subwords
-        """
-        # Found words
-        words = []
-        # Get all words of length word_length and check if present in seq2
-        for i in range(0, len(seq1)-self.word_length+1):
-            # Get substring of word length
-            word = seq1[i:i+self.word_length]
-            # Get start & end indexes of matches
-            matches = [(m.start(0), m.end(0)) for m in re.finditer(word, seq2)]
-            if matches:
-                for match in matches:
-                    # Store in format (seq1 - start, end), (seq2 - start, end)
-                    words.append([(i, i+self.word_length), match])
-        return words
-
-    def get_diagonals(self, seeds):
-        """
-        Given the word indices, find ones that lie on the same diagonal.
-        They lie on the same diagonal if the difference in start index is the same
-        :param seeds: list of tuples of  matches in words
-        :return:
-        """
-        # Store the difference as the key, and the indices as the values
-        diagonals = {}
-        # Iterate over all seeds
-        for item in seeds:
-            # Get difference in starting index
-            diff = item[0][0] - item[1][0]
-            # Add item to dict s.t. all items w/ same diff in starting index have same key in dict
-            try:
-                diagonals[diff].append(item)
-            except KeyError:
-                diagonals[diff] = [item]
-        return diagonals
-
-    def get_threshold(self):
+    def get_threshold():
         """
         Iterate over scoring matrix and determine the threshold value
         :return: int, threshold hold value
         """
         # Calculate weighted average according to symbol count within the sequences
-        char_freq = {i: (self.seq1+self.seq2).count(i)/len(self.seq1+self.seq2) for i in self.alphabet}
+        char_freq = {i: (seq_s+seq_t).count(i)/len(seq_s+seq_t) for i in alphabet}
 
         # For all pairs, get scores and weight by char_freq
-        pairs = [[i, j] for i in self.alphabet for j in self.alphabet]
+        pairs = [[i, j] for i in alphabet for j in alphabet]
         pair_weights = [char_freq[x]+char_freq[y] for x, y in pairs]
 
         # Expected score
@@ -287,7 +183,7 @@ class FASTA:
 
         return threshold
 
-    def extend(self, diagonals):
+    def extend(diagonals):
         """
         Given a dict of all seeds along the same diagonal, extend them if they lie upon the
         same diagonal and return the new start-end indices
@@ -296,7 +192,7 @@ class FASTA:
         """
 
         # Calculate the expected score of any given string
-        threshold = self.get_threshold()
+        threshold = get_threshold()
 
         # Repeat until no more merges occur
         while True:
@@ -316,11 +212,11 @@ class FASTA:
                     # Loop over all seeds on the same diagonal
                     for i in range(len(seeds)-1):
                         # Get subsequences between seeds & score it
-                        subseq1, subseq2 = self.seq1[seeds[i][0][1]:seeds[i+1][0][0]], \
-                                           self.seq2[seeds[i][1][1]:seeds[i+1][1][0]]
+                        subseq_s, subseq_t = seq_s[seeds[i][0][1]:seeds[i+1][0][0]], \
+                                           seq_t[seeds[i][1][1]:seeds[i+1][1][0]]
                         score = 0
-                        for j in range(len(subseq1)):
-                            score += get_score(alphabet, scoring_matrix, subseq1[j], subseq2[j])
+                        for j in range(len(subseq_s)):
+                            score += get_score(alphabet, scoring_matrix, subseq_s[j], subseq_t[j])
 
                         # If score >= expected value -> merge
                         if score >= threshold:
@@ -344,7 +240,7 @@ class FASTA:
 
         return diagonals
 
-    def get_best(self, diagonals):
+    def get_best(diagonals):
         """
         Given the (now merged diagonals), get the best n seeds.
         :param diagonals: dict of seeds along same diagonals.
@@ -357,10 +253,10 @@ class FASTA:
         # Gets top 'to_return' # scores
         for diagonal_id in diagonals:
             for seed in diagonals[diagonal_id]:
-                seq1, seq2 = self.seq1[seed[0][0]:seed[0][1]], self.seq2[seed[1][0]:seed[1][1]]
+                seq1, seq2 = seq_s[seed[0][0]:seed[0][1]], seq_t[seed[1][0]:seed[1][1]]
                 score = 0
                 for i in range(len(seq1)):
-                    score += get_score(alphabet, scoring_matrix,seq1[i], seq2[i])
+                    score += get_score(alphabet, scoring_matrix, seq1[i], seq2[i])
                 if len(top_scores) < to_return:
                     top_scores.append([score, seed])
                 elif score > top_scores[-1][0]:
@@ -370,7 +266,7 @@ class FASTA:
                 top_scores = sorted(top_scores, key=lambda x: x[0], reverse=True)
         return [x[1] for x in top_scores]
 
-    def banded_smith_waterman(self, best_seeds):
+    def banded_smith_waterman(best_seeds):
         """
         Run banded smith waterman with the width = avg distance between diagonals
         :param best_seeds: 2d arr of (start, end) indices for best seeds
@@ -383,44 +279,57 @@ class FASTA:
         best_results = None
         for seed in best_seeds:
             # print("Running BSW...")
-            results = banded_SW(alphabet, scoring_matrix, self.seq1, self.seq2, width, seed)
+            results = banded_SW(alphabet, scoring_matrix, seq_s, seq_t, width, seed)
             # print("Input Seed {0} | Output - {1}".format(seed, results))
             if results[0] > max_score:
                 max_score = results[0]
                 best_results = results
         return best_results
 
-    def align(self):
-        # --- 1) Seed sequences - find word sequences the sequences have in common ---
+
+    # --- 1) Seed sequences - find word sequences the sequences have in common ---
+    seeds = []
+    while not seeds:
         seeds = []
-        while not seeds:
-            seeds = self.seed(self.seq1, self.seq2)
-            if not seeds:
-                self.word_length -= 1
-                if self.word_length == 0:
-                    print("Sequences contain NO matching characters! Cannot seed!")
-                    return [0, [[], [], [], []]]
-        # print("Got seeds.")
+        # Get all words of length word_length and check if present in seq2
+        for i in range(0, len(seq_s) - word_length + 1):
+            # Get substring of word length
+            word = seq_s[i:i + word_length]
+            # Get start & end indexes of matches
+            matches = [(m.start(0), m.end(0)) for m in re.finditer(word, seq_t)]
+            if matches:
+                for match in matches:
+                    # Store in format (seq1 - start, end), (seq2 - start, end)
+                    seeds.append([(i, i + word_length), match])
+        if not seeds:
+            word_length -= 1
+            if not word_length:
+                print("Sequences contain NO matching characters! Cannot seed!")
+                return [0, [[], [], [], []]]
 
-        # --- 2) Identify matching diagonals in seeds ---
-        diagonals = self.get_diagonals(seeds)
-        # print("Got seeds along same diagonal.")
+    # --- 2) Identify matching diagonals in seeds ---
+    diagonals = {}
+    # Iterate over all seeds
+    for item in seeds:
+        # Get difference in starting index
+        diff = item[0][0] - item[1][0]
+        # Add item to dict s.t. all items w/ same diff in starting index have same key in dict
+        try:
+            diagonals[diff].append(item)
+        except KeyError:
+            diagonals[diff] = [item]
+    # print("Got seeds along same diagonal.")
 
-        # --- 3) Greedily extend words along diagonals if score of subsequence > threshold ---
-        diagonals = self.extend(diagonals)
-        # print("Seeds extended.")
+    # --- 3) Greedily extend words along diagonals if score of subsequence > threshold ---
+    diagonals = extend(diagonals)
+    # print("Seeds extended.")
 
-        # --- 4) Get top n% of seeds ---
-        best_seeds = self.get_best(diagonals)
-        # print("Got best seeds.")
+    # --- 4) Get top n% of seeds ---
+    # Fixed val as otherwise time grows ++ w/ increase in sequence length
+    best_seeds = get_best(diagonals)
 
-        # --- 5) Run banded SmithWaterman (with width A) on best seed ---
-        return self.banded_smith_waterman(best_seeds)
-
-
-def heuralign(alphabet, scoring_matrix, sequence1, sequence2):
-    FA = FASTA(sequence1, sequence2, scoring_matrix, alphabet)
-    return FA.align()
+    # --- 5) Run banded SmithWaterman (with width A) on best seed ---
+    return banded_smith_waterman(best_seeds)
 
 
 if __name__ == "__main__":
