@@ -1,8 +1,3 @@
-import helper_functions
-import re
-import numpy as np
-import math
-
 def backtrack(paths: list, max_indices: tuple) -> tuple:
     i, j = max_indices
     alignment_s, alignment_t = [], []
@@ -164,7 +159,7 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
     :param seq_t: sequence of chars, str
     :return: 2 arr's of each chars alignment
     """
-    ktup = max(3, math.ceil(min(len(seq_s), len(seq_t)) * 0.015))
+    ktup = max(3, int(-(-min(len(seq_s), len(seq_t)) // (200/3))))
 
     def get_diagonals(seed_list: list) -> dict:
         seed_diagonals = {}
@@ -201,7 +196,6 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
         return ktup_val, seed_list
 
     def extend_diagonal(diagonal_seeds: list) -> tuple:
-        print(diagonal_seeds)
         # seeds start at length ktup, and begin in the form ((s_start, t_start), score)
         # they end as length >= ktup, and are translated to the form ((s_start, t_start), score, length)
         extended_seeds = set()
@@ -249,32 +243,6 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
             extended_seeds.add((s_start, t_start, seed_score, length))
             total_score += seed_score
         return total_score, list(extended_seeds)
-
-    def get_best(diagonals):
-        """
-        Given the (now merged diagonals), get the best n seeds.
-        :param diagonals: dict of seeds along same diagonals.
-        :return:
-        """
-        # Fixed val as otherwise time grows ++ w/ increase in sequence length
-        to_return = 1
-        top_scores = []
-
-        # Gets top 'to_return' # scores
-        for diagonal_id in diagonals:
-            for seed in diagonals[diagonal_id]:
-                seq1, seq2 = seq_s[seed[0][0]:seed[0][1]], seq_t[seed[1][0]:seed[1][1]]
-                score = 0
-                for i in range(len(seq1)):
-                    score += get_score(alphabet, scoring_matrix, seq1[i], seq2[i])
-                if len(top_scores) < to_return:
-                    top_scores.append([score, seed])
-                elif score > top_scores[-1][0]:
-                    del top_scores[-1]
-                    top_scores.append([score, seed])
-                # Sort in desc order by score
-                top_scores = sorted(top_scores, key=lambda x: x[0], reverse=True)
-        return [x[1] for x in top_scores]
 
     def banded_smith_waterman(best_seeds):
         """
