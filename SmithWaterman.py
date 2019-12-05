@@ -77,9 +77,14 @@ def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
     seq_s, seq_t = seq_s[shift[0]:len(seq_s) - shift[1]], seq_t[shift[1]:len(seq_t) - shift[0]]
 
     # initialises cost and backtrack (paths) matrix here
-
-    values = [[0 for _ in range(len(seq_s) + 1)] for _ in range(len(seq_t) + 1)]
+    values = []
+    for i in range(len(seq_s) + 1):
+        values.append([])
+        for j in range(len(seq_t) + 1):
+            values[i].append(0)
+    # values = [[0 for _ in range(len(seq_s) + 1)] for _ in range(len(seq_t) + 1)]
     paths = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
+
     paths[0] = ['L' for _ in range(len(paths[0]))]
     for i in range(len(paths)):
         paths[i][0] = 'U'
@@ -106,7 +111,7 @@ def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
                 # Update scoring matrix
                 values[y][x] = max_val
                 # Get index of max
-                path_val = ['D', 'L', 'U'][[diag, left, up].index(max_val)]
+                path_val = ['D', 'L', 'U', 'R'][[diag, left, up, 0].index(max_val)]
 
                 # Update backtrack matrix if score it come from is a valid cell
                 if path_val == 'D' and (x - 1 + shift[0], y - 1 + shift[1]) in cell_set:
