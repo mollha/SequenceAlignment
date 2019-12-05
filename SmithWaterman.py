@@ -46,14 +46,6 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         alignment_t = alignment_t[1:]
     return score
 
-"""
-1) Basic dynamic programming that runs in quadratic time and space [up to 50 marks].
-2) Dynamic programming that runs in linear space [up to 65 marks].
-3)A Heuristic procedure that runs in sub-quadratic time (similar to FASTA and BLAST) [up to 85 marks].
-They should output three items: the score of the best local alignment found by the algorithm plus two lists of indices,
-one for each input sequences, that realise the matches/mismatches in the alignment.
-"""
-
 def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, width, seed):
     # Set to store all (x, y) coors of valid regions in the grid
     region = set()
@@ -151,21 +143,14 @@ def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, width, seed):
     return max_score, alignment_s, alignment_t
 
 
-def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
-    """
-    3) Heuristic procedure that runs in sub-quadratic time (similar to FASTA and BLAST) [up to 85 marks].
-    - for local alignment
-    :param seq_s: sequence of chars, str
-    :param seq_t: sequence of chars, str
-    :return: 2 arr's of each chars alignment
-    """
+def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
+
     ktup = max(3, int(-(-min(len(seq_s), len(seq_t)) // (200/3))))
 
     def get_diagonals(seed_list: list) -> dict:
         seed_diagonals = {}
         for seed in seed_list:
-            # seeds are of length ktup, and are in the form (s_index, t_index, score)
-            difference = seed[1] - seed[0]    # t_index - s_index
+            difference = seed[1] - seed[0]
             if difference in seed_diagonals:
                 seed_diagonals[difference].append(seed)
             else:
@@ -244,26 +229,6 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
             total_score += seed_score
         return total_score, list(extended_seeds)
 
-    def banded_smith_waterman(best_seeds):
-        """
-        Run banded smith waterman with the width = avg distance between diagonals
-        :param best_seeds: 2d arr of (start, end) indices for best seeds
-        :return: results for FASTA
-        """
-        width = 32
-
-        # --- 2) Run BandedSmithWaterman on each pair using the found average distance between diagonals ---
-        max_score = -float('inf')
-        best_results = None
-        for seed in best_seeds:
-            # print("Running BSW...")
-            results = banded_SW(alphabet, scoring_matrix, seq_s, seq_t, width, seed)
-            # print("Input Seed {0} | Output - {1}".format(seed, results))
-            if results[0] > max_score:
-                max_score = results[0]
-                best_results = results
-        return best_results
-
     ktup, seeds = get_seeds(ktup)
 
     # if there are NO seeds, then just choose the middle diagonal
@@ -280,10 +245,19 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
     tuples = [triple[0][1][0] for triple in top_3]
     best_seeds = [[(i_tuple[0], i_tuple[0] + i_tuple[3]), (i_tuple[1], i_tuple[1] + i_tuple[3])] for i_tuple in tuples]
 
+    width = 32
 
-    # --- 5) Run banded SmithWaterman (with width A) on best seed ---
-    return banded_smith_waterman(best_seeds)
-
+    # --- 2) Run BandedSmithWaterman on each pair using the found average distance between diagonals ---
+    max_score = -float('inf')
+    best_results = None
+    for seed in best_seeds:
+        # print("Running BSW...")
+        results = banded_SW(alphabet, scoring_matrix, seq_s, seq_t, width, seed)
+        # print("Input Seed {0} | Output - {1}".format(seed, results))
+        if results[0] > max_score:
+            max_score = results[0]
+            best_results = results
+    return best_results
 
 if __name__ == "__main__":
     alphabet = "ABCD"
