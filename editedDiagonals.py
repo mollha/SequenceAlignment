@@ -59,10 +59,7 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         sequence_t += seq_t[alignment_t[0]]
         alignment_s = alignment_s[1:]
         alignment_t = alignment_t[1:]
-    print(sequence_s)
-    print(sequence_t)
     return score
-
 
 def banded_smith_waterman(alphabet, scoring_matrix, seq_s, seq_t, diagonal: int, search_width) -> tuple:
     high_score = -float('inf')
@@ -70,11 +67,13 @@ def banded_smith_waterman(alphabet, scoring_matrix, seq_s, seq_t, diagonal: int,
     values, paths = [], []
     j_pairs = {}
 
-    for i in range(max(-diagonal, 0), min(len(seq_s), len(seq_t) - diagonal)):
+    for i in range(len(seq_s - 1)):
         values.append([])
         paths.append([])
         grid_i = i - max(-diagonal, 0)
         for j in range(i + diagonal - search_width, min(i + diagonal + search_width + 1, len(seq_t))):
+            if j in range(i + diagonal - search_width, min(i + diagonal + search_width + 1, len(seq_t))):
+
             grid_j = len(values[grid_i])
             path_val = ''
 
