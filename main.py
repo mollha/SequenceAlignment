@@ -1,7 +1,24 @@
-# ------------------------ ADDITIONAL FUNCTIONS --------------------------
+# --------------------------------------------- ADDITIONAL FUNCTIONS --------------------------------------------------
 def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
     alpha += '_'
     return scoring[alpha.index(char_s)][alpha.index(char_t)]
+
+
+def check_score(alpha: str, scoring: list, seq_s: str, seq_t: str, alignment_s: list, alignment_t: list) -> int:
+    total_score = 0
+    for i in range(alignment_s[0], alignment_s[-1]):
+        if i not in alignment_s:
+            total_score += get_score(alpha, scoring, seq_s[i], '_')
+
+    for i in range(alignment_t[0], alignment_t[-1]):
+        if i not in alignment_t:
+            total_score += get_score(alpha, scoring, '_', seq_t[i])
+
+    while alignment_s and alignment_t:
+        total_score += get_score(alpha, scoring, seq_s[alignment_s[0]], seq_t[alignment_t[0]])
+        alignment_s = alignment_s[1:]
+        alignment_t = alignment_t[1:]
+    return total_score
 
 
 def backtrack(paths: list, max_indices: tuple) -> tuple:
@@ -132,9 +149,9 @@ def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
     seq_s, seq_t = seq_s[shift[0]:len(seq_s) - shift[1]], seq_t[shift[1]:len(seq_t) - shift[0]]
 
     values = [[0 for _ in range(len(seq_s) + 1)] for _ in range(len(seq_t) + 1)]
-    paths = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
+    len_val, len_val_zero = len(values), len(values[0])
+    paths = [['R' for _ in range(len_val_zero)] for _ in range(len_val)]
 
-    values[0][0] = 0
     for i in range(len(seq_s)):
         values[0][i + 1] = max(0, values[0][i] + get_score(alpha, scoring, seq_s[i], '_'))
 
@@ -373,4 +390,4 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tu
         if max_score < score:
             max_score = score
             response = score, alignment_s, alignment_t
-    return response
+    return check_score(alphabet, scoring_matrix, seq_s, seq_t, response[1], response[2]), response[1], response[2]
