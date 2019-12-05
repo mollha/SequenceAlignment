@@ -46,32 +46,34 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         alignment_t = alignment_t[1:]
     return score
 
-def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, seed):
-    width = 30
-    # Set to store all (x, y) coors of valid regions in the grid
-    region = set()
-    # Iterate up + left add all along diagonal + any width away to set
-    x, y = seed[0][0], seed[1][0]
-    while x >= 0 and y >= 0:
-        for i in range(-width, width + 1):
-            for j in range(-width, width + 1):
-                if 0 <= x + i < len(seq_s) and 0 <= y + j < len(seq_t):
-                    region.add((x + i, y + j))
-        x -= 1
-        y -= 1
-    # Iterate down + right add all along diagonal + any width away to set
-    x, y = seed[0][0] + 1, seed[1][0] + 1
+def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
 
-    while x < len(seq_s) and y < len(seq_t):
+    def get_cells(u, v):
+        update_cells = set()
         for i in range(-width, width + 1):
             for j in range(-width, width + 1):
-                if 0 <= x + i < len(seq_s) and 0 <= y + j < len(seq_t):
-                    region.add((x + i, y + j))
-        x += 1
-        y += 1
+                if 0 <= u + i < len(seq_s) and 0 <= v + j < len(seq_t):
+                    update_cells.add((u + i, v + j))
+        return update_cells
+
+    width = 30
+    u, v = seed
+    cell_set = set()
+    while True:
+        if v < 0 or u < 0:
+            break
+        cell_set.update(get_cells(u, v))
+        u, v = u - 1, v - 1
+
+    u, v = seed[0] + 1, seed[1] + 1
+    while True:
+        if u >= len(seq_s) or v >= len(seq_t):
+            break
+        cell_set.update(get_cells(u, v))
+        u, v = u + 1, v + 1
 
     # region has been created
-    x, y = seed[0][0], seed[1][0]  # seq_s -> x, seq_t -> y
+    x, y = seed
     x_intercept, y_intercept = x - min(x, y), y - min(x, y)
     # Banded region is width space away from cells on diagonal in dirs: left, right, up, down (that exist)
     # Get starts of seq_s & seq_t (leftmost cell and topmost cell)
@@ -94,14 +96,15 @@ def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, seed):
     for i in range(len(backtrack_matrix)):
         backtrack_matrix[i][0] = 'U'
     # Set 0,0 to None (always terminate here)
-    backtrack_matrix[0][0] = None
+    backtrack_matrix[0][0] = 'R'
     values[0] = [0 for _ in range(len(values[0]))]
+
     for i in range(len(values)):
         values[i][0] = 0
 
     # Max score tracker
     max_score = -float('inf')
-    max_index = [0, 0]  # init to 0,0 (0 score)
+    max_index = (0, 0)  # init to 0,0 (0 score)
 
     # Iterate over scoring matrix and generate scoring (start at 1,1 and work from there)
     for y in range(1, len(seq_t) + 1):  # y -> seq_t
@@ -109,7 +112,7 @@ def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, seed):
         flag = False
         for x in range(1, len(seq_s) + 1):  # x -> seq_s
             # Check if current scoring cell lies in diagonal
-            if (x + seq_s_offset, y + seq_t_offset) in region:
+            if (x + seq_s_offset, y + seq_t_offset) in cell_set:
                 # Set flag (as reached banded region)
                 flag = True
                 # If in diagonal, score as normal (cell not in diagonal all have score = 0)
@@ -124,16 +127,16 @@ def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, seed):
                 # Get index of max
                 index = vals.index(max(vals))
                 # Update backtrack matrix if score it come from is a valid cell
-                if index == 0 and (x - 1 + seq_s_offset, y - 1 + seq_t_offset) in region:
+                if index == 0 and (x - 1 + seq_s_offset, y - 1 + seq_t_offset) in cell_set:
                     backtrack_matrix[y][x] = 'D'
-                elif index == 1 and (x + seq_s_offset, y - 1 + seq_t_offset) in region:
+                elif index == 1 and (x + seq_s_offset, y - 1 + seq_t_offset) in cell_set:
                     backtrack_matrix[y][x] = 'U'
-                elif index == 2 and (x - 1 + seq_s_offset, y + seq_t_offset) in region:
+                elif index == 2 and (x - 1 + seq_s_offset, y + seq_t_offset) in cell_set:
                     backtrack_matrix[y][x] = 'L'
                 # Check if new greatest score seen (score for vals outside diagonals score = 0)
                 if max(vals) > max_score:
                     max_score = max(vals)
-                    max_index = [y, x]
+                    max_index = (y, x)
             else:
                 # If cell doesn't lie in diagonal -> score = 0 (local alignment still)
                 values[y][x] = 0
@@ -146,7 +149,7 @@ def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, seed):
 
 def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
 
-    ktup = max(3, int(-(-min(len(seq_s), len(seq_t)) // (200/3))))
+    ktup = max(3, int(-(-min(len(seq_s), len(seq_t)) // 50)))
 
     while True:
         seed_dictionary = {}
@@ -171,7 +174,7 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
 
     # if there are NO seeds, then just choose the middle diagonal
     if not seeds:
-        return banded_SW(alphabet, scoring_matrix, seq_s, seq_t, [(0, 0), (0, 0)])
+        return banded_sw(alphabet, scoring_matrix, seq_s, seq_t, (0, 0))
 
     diagonals = {}
     for seed in seeds:
@@ -181,11 +184,7 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
         else:
             diagonals[difference] = [seed]
 
-
-
     def extend_diagonal(diagonal_seeds: list) -> tuple:
-        # seeds start at length ktup, and begin in the form ((s_start, t_start), score)
-        # they end as length >= ktup, and are translated to the form ((s_start, t_start), score, length)
         extended_seeds = set()
         total_score = 0
         for seed_tuple in diagonal_seeds:
@@ -223,7 +222,7 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
             for existing_seed in extended_seeds:
                 lower, upper = existing_seed[0], existing_seed[0] + length
                 if (lower <= s_start <= upper) or (lower <= s_start + length <= upper):
-                    # Overlap exists
+                    # overlap exists
                     if existing_seed[2] < seed_score:
                         total_score -= existing_seed[2]
                         clone_set.remove(existing_seed)
@@ -235,20 +234,19 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     diagonal_scores = []
     for diagonal_key in diagonals:
         diagonal_scores.append((extend_diagonal(diagonals[diagonal_key]), diagonal_key))
-    print(diagonal_scores)
     diagonal_scores.sort(key=lambda x: x[0][0], reverse=True)
     top_3 = diagonal_scores[0: min(3, len(diagonal_scores))]  # get top 3 diagonals
     tuples = [triple[0][1][0] for triple in top_3]
-    best_seeds = [[(i_tuple[0], i_tuple[0] + i_tuple[3]), (i_tuple[1], i_tuple[1] + i_tuple[3])] for i_tuple in tuples]
+    best_seeds = [(seed_tuple[0], seed_tuple[1]) for seed_tuple in tuples]
 
     max_score = -float('inf')
-    best_results = None
+    response = None
     for seed in best_seeds:
-        results = banded_SW(alphabet, scoring_matrix, seq_s, seq_t, seed)
-        if results[0] > max_score:
-            max_score = results[0]
-            best_results = results
-    return best_results
+        score, alignment_s, alignment_t = banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed)
+        if max_score < score:
+            max_score = score
+            response = score, alignment_s, alignment_t
+    return response
 
 if __name__ == "__main__":
     alphabet = "ABCD"
@@ -258,8 +256,10 @@ if __name__ == "__main__":
             [-5,-5, 5,-5,-4],
             [-5,-5,-5, 6,-4],
             [-1,-1,-4,-4,-9]]
-    sequence1 = "DDCDDCCCDCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACCCCDDDCDADCDCDCDCD"
+    sequence1 = "DDCDDCCCDCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACCCCDDDDDDAAAACADDCDADCDCDCDCD"
     sequence2 = "DDCDDCCCDCBCCCCDDDCDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBDCDCDCDCD"
+
+    # TODO check what happens when no matches
 
     # Strip to ensure no whitespace
     sequence1, sequence2 = sequence1.strip(), sequence2.strip()

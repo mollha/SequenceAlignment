@@ -2,45 +2,24 @@ from random import choice
 import time
 
 # ------------------------ HELPER FUNCTIONS --------------------------
-def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t):
-    score = 0
+
+
+# TODO remove this function once checks are complete
+def check_score(alpha: str, scoring: list, seq_s: str, seq_t: str, alignment_s: list, alignment_t: list):
+    score_val = 0
     for i in range(alignment_s[0], alignment_s[-1]):
         if i not in alignment_s:
-            score += get_score(alphabet, scoring_matrix, seq_s[i], '_')
+            score_val += get_score(alpha, scoring, seq_s[i], '_')
 
     for i in range(alignment_t[0], alignment_t[-1]):
         if i not in alignment_t:
-            score += get_score(alphabet, scoring_matrix, '_', seq_t[i])
+            score_val += get_score(alpha, scoring, '_', seq_t[i])
 
     while alignment_s and alignment_t:
-        score += get_score(alphabet, scoring_matrix, seq_s[alignment_s[0]], seq_t[alignment_t[0]])
+        score_val += get_score(alpha, scoring, seq_s[alignment_s[0]], seq_t[alignment_t[0]])
         alignment_s = alignment_s[1:]
         alignment_t = alignment_t[1:]
-    return score
-
-
-def last_row(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tuple:
-    row1, row2 = [], []
-    for i in range(0, len(seq_s) + 1):
-        if row2:
-            row1 = row2
-            row2 = []
-
-        for j in range(0, len(seq_t) + 1):
-            if not i and not j:
-                row1.append(0)
-            elif not i:
-                row1.append(row1[j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1]))
-            elif not j:
-                row2.append(row1[j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_'))
-            else:
-                # At this stage, we can assume we have completed row1 - we only append to row2
-                diag = row1[j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
-                up = row1[j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
-                left = row2[j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
-                val = max(diag, up, left)
-                row2.append(val)
-    return row2
+    return score_val
 
 
 def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
@@ -69,7 +48,30 @@ def backtrack(paths: list, max_indices: tuple) -> tuple:
     return alignment_s, alignment_t
 
 
-def needleman_wunsch(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tuple:
+def last_row(alpha: str, scoring: list, seq_s: str, seq_t: str) -> list:
+    row1, row2 = [], []
+    for i in range(0, len(seq_s) + 1):
+        if row2:
+            row1 = row2
+            row2 = []
+
+        for j in range(0, len(seq_t) + 1):
+            if not i and not j:
+                row1.append(0)
+            elif not i:
+                row1.append(row1[j - 1] + get_score(alpha, scoring, '_', seq_t[j - 1]))
+            elif not j:
+                row2.append(row1[j] + get_score(alpha, scoring, seq_s[i - 1], '_'))
+            else:
+                diag = row1[j - 1] + get_score(alpha, scoring, seq_s[i - 1], seq_t[j - 1])
+                up = row1[j] + get_score(alpha, scoring, seq_s[i - 1], '_')
+                left = row2[j - 1] + get_score(alpha, scoring, '_', seq_t[j - 1])
+                val = max(diag, up, left)
+                row2.append(val)
+    return row2
+
+
+def needleman_wunsch(alpha: str, scoring: list, seq_s: str, seq_t: str) -> tuple:
     values = []
     paths = []
     for i in range(0, len(seq_s) + 1):
@@ -80,15 +82,15 @@ def needleman_wunsch(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str
                 val = 0
                 path_val = 'R'
             elif not i:
-                val = values[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                val = values[i][j - 1] + get_score(alpha, scoring, '_', seq_t[j - 1])
                 path_val = 'L'
             elif not j:
-                val = values[i - 1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
+                val = values[i - 1][j] + get_score(alpha, scoring, seq_s[i - 1], '_')
                 path_val = 'U'
             else:
-                diag = values[i - 1][j - 1] + get_score(alphabet, scoring_matrix, seq_s[i - 1], seq_t[j - 1])
-                up = values[i - 1][j] + get_score(alphabet, scoring_matrix, seq_s[i - 1], '_')
-                left = values[i][j - 1] + get_score(alphabet, scoring_matrix, '_', seq_t[j - 1])
+                diag = values[i - 1][j - 1] + get_score(alpha, scoring, seq_s[i - 1], seq_t[j - 1])
+                up = values[i - 1][j] + get_score(alpha, scoring, seq_s[i - 1], '_')
+                left = values[i][j - 1] + get_score(alpha, scoring, '_', seq_t[j - 1])
                 val = max(diag, up, left)
                 path_val = ['D', 'L', 'U', ][[diag, left, up].index(val)]
             values[i].append(val)
@@ -96,15 +98,15 @@ def needleman_wunsch(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str
     return backtrack(paths, (len(seq_s), len(seq_t)))
 
 
-def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, offset: tuple, left=True) -> tuple:
+def hirschberg(alpha: str, scoring: list, seq_s: str, seq_t: str, offset: tuple, left=True) -> tuple:
     if len(seq_s) == 1 or len(seq_t) == 1:
-        alignment_s, alignment_t = needleman_wunsch(alphabet, scoring_matrix, seq_s, seq_t)
+        alignment_s, alignment_t = needleman_wunsch(alpha, scoring, seq_s, seq_t)
         alignment_s, alignment_t = [s + offset[0] for s in alignment_s], [t + offset[1] for t in alignment_t]
         return alignment_s, alignment_t
     else:
 
-        last_row_1 = last_row(alphabet, scoring_matrix, seq_s[:len(seq_s) // 2], seq_t)
-        last_row_2 = last_row(alphabet, scoring_matrix, seq_s[len(seq_s) // 2:][::-1], seq_t[::-1])
+        last_row_1 = last_row(alpha, scoring, seq_s[:len(seq_s) // 2], seq_t)
+        last_row_2 = last_row(alpha, scoring, seq_s[len(seq_s) // 2:][::-1], seq_t[::-1])
         last_row_2.reverse()
 
         zipped = [x + y for x, y in zip(last_row_1, last_row_2)]
@@ -116,12 +118,13 @@ def hirschberg(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str, offs
         else:
             index = max(max_positions)
 
-        alignment_s_half1, alignment_t_half1 = hirschberg(alphabet, scoring_matrix, seq_s[:len(seq_s) // 2],
+        alignment_s_half1, alignment_t_half1 = hirschberg(alpha, scoring, seq_s[:len(seq_s) // 2],
                                                           seq_t[:index], offset, left=True)
-        alignment_s_half2, alignment_t_half2 = hirschberg(alphabet, scoring_matrix, seq_s[len(seq_s) // 2:],
+        alignment_s_half2, alignment_t_half2 = hirschberg(alpha, scoring, seq_s[len(seq_s) // 2:],
                                                           seq_t[index:],
                                                           (offset[0] + (len(seq_s) // 2), offset[1] + index), left=False)
     return alignment_s_half1 + alignment_s_half2, alignment_t_half1 + alignment_t_half2
+
 
 # ---------------------------------------------------------------------
 
@@ -228,16 +231,6 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> l
     return [high_score, alignment_s, alignment_t]
 
 
-def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
-    ktup = 3
-    index_table = {}
-    # IF s length < ktup, we won't be able to find any seeds
-    if len(seq_s) < ktup:
-        pass
-    else:
-        for i in range(0, len(seq_s) - ktup):
-            pass
-
 
 
 
@@ -245,18 +238,8 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
 
 # TESTS
 
-string_1 ="BDABCBBDCAABDDCDABACDADDCBCABA"
-string_2 ="CCAABBBDABACADBCCADCADAAACDCCA"
-
-
-
-string_1, string_2 = "BCBBBDBDBCCDDBABBCD", "BCBBDDDAACADDACD"
 scoring_matrix = [[ 1,-5,-5,-5,-1],[-5, 1,-5,-5,-1],[-5,-5, 5,-5,-4],[-5,-5,-5, 6,-4],[-1,-1,-4,-4,-9]]
 alphabet = "ABCD"
-# alphabet = "AGCT"
-# string_1, string_2 = "AGTACGCA", "TATGC"
-# scoring_matrix = [[2,-1,-1,-1,-2],[-1,2,-1,-1,-2],[-1,-1,2,-1,-2],[-1,-1,-1,2,-2],[-2,-2,-2,-2,0]]
-# print(hirschberg(alphabet, scoring_matrix, string_1, string_2, (0,0)))
 
 x = 500
 string_1 = "".join(choice(list(alphabet)) for i in range(x))
