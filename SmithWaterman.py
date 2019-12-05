@@ -49,8 +49,10 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
 def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
     band_width = 30
     u, v, x, y = seed[0], seed[1], seed[0] + 1, seed[1] + 1
+    shift = max(0, seed[0] - min(seed[0], seed[1]) - band_width), max(0, seed[1] - min(seed[0], seed[1]) - band_width)
     cell_set = set()
 
+    # ---------------------------- INITIALIZE CELL SET ----------------------------
     def get_cells(u, v):
         update_cells = set()
         for i in range(-band_width, band_width + 1):
@@ -64,24 +66,11 @@ def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
         cell_set.update(get_cells(u, v))
 
     for t_index in range(min(len(seq_s) - seed[0] + 1, len(seq_t) - seed[1] + 1)):
-        x, y = x + s_index, y + s_index
+        x, y = x + t_index, y + t_index
         cell_set.update(get_cells(u, v))
+    # -----------------------------------------------------------------------------
 
-    # region has been created
-    x, y = seed
-    x_intercept, y_intercept = x - min(x, y), y - min(x, y)
-    # Banded region is band_width space away from cells on diagonal in dirs: left, right, up, down (that exist)
-    # Get starts of seq_s & seq_t (leftmost cell and topmost cell)
-    seq_s_start = max(0, x_intercept - band_width)
-    seq_t_start = max(0, y_intercept - band_width)
-    # Get ends of seq_s & seq_t (rightmost and bottommost cell)
-    seq_s_end = len(seq_s) - seq_t_start
-    seq_t_end = len(seq_t) - seq_s_start
-
-    seq_s = seq_s[seq_s_start:seq_s_end]
-    seq_t = seq_t[seq_t_start:seq_t_end]
-    seq_s_offset = seq_s_start
-    seq_t_offset = seq_t_start
+    seq_s, seq_t = seq_s[shift[0]:len(seq_s) - shift[1]], seq_t[shift[1]:len(seq_t) - shift[0]]
 
     # initialises cost and backtrack (paths) matrix here
 
@@ -107,7 +96,7 @@ def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
         flag = False
         for x in range(1, len(seq_s) + 1):  # x -> seq_s
             # Check if current scoring cell lies in diagonal
-            if (x + seq_s_offset, y + seq_t_offset) in cell_set:
+            if (x + shift[0], y + shift[1]) in cell_set:
                 # Set flag (as reached banded region)
                 flag = True
                 # If in diagonal, score as normal (cell not in diagonal all have score = 0)
@@ -122,11 +111,11 @@ def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
                 # Get index of max
                 index = vals.index(max(vals))
                 # Update backtrack matrix if score it come from is a valid cell
-                if index == 0 and (x - 1 + seq_s_offset, y - 1 + seq_t_offset) in cell_set:
+                if index == 0 and (x - 1 + shift[0], y - 1 + shift[1]) in cell_set:
                     backtrack_matrix[y][x] = 'D'
-                elif index == 1 and (x + seq_s_offset, y - 1 + seq_t_offset) in cell_set:
+                elif index == 1 and (x + shift[0], y - 1 + shift[1]) in cell_set:
                     backtrack_matrix[y][x] = 'U'
-                elif index == 2 and (x - 1 + seq_s_offset, y + seq_t_offset) in cell_set:
+                elif index == 2 and (x - 1 + shift[0], y + shift[1]) in cell_set:
                     backtrack_matrix[y][x] = 'L'
                 # Check if new greatest score seen (score for vals outside diagonals score = 0)
                 if max(vals) > max_score:
