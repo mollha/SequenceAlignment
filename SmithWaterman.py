@@ -148,38 +148,40 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
 
     ktup = max(3, int(-(-min(len(seq_s), len(seq_t)) // (200/3))))
 
-    def get_diagonals(seed_list: list) -> dict:
-        seed_diagonals = {}
-        for seed in seed_list:
-            difference = seed[1] - seed[0]
-            if difference in seed_diagonals:
-                seed_diagonals[difference].append(seed)
+    while True:
+        seed_dictionary = {}
+        seeds = []
+        for index in range(len(seq_s) - ktup + 1):
+            subword = seq_s[index: index + ktup]
+            if subword in seed_dictionary:
+                seed_dictionary[subword].append(index)
             else:
-                seed_diagonals[difference] = [seed]
-        return seed_diagonals
+                seed_dictionary[subword] = [index]
+        for index in range(len(seq_s) - ktup + 1):
+            subword = seq_t[index: index + ktup]
+            score_list = [get_score(alphabet, scoring_matrix, char, char) for char in subword]
+            seed_score = sum(score_list)
 
-    def get_seeds(ktup_val: int) -> tuple:
-        while True:
-            seed_dictionary = {}
-            seed_list = []
-            for index in range(len(seq_s) - ktup_val + 1):
-                subword = seq_s[index: index + ktup_val]
-                if subword in seed_dictionary:
-                    seed_dictionary[subword].append(index)
-                else:
-                    seed_dictionary[subword] = [index]
-            for index in range(len(seq_s) - ktup_val + 1):
-                subword = seq_t[index: index + ktup_val]
-                score_list = [get_score(alphabet, scoring_matrix, char, char) for char in subword]
-                seed_score = sum(score_list)
+            if subword in seed_dictionary:
+                seeds += [(s_index, index, seed_score) for s_index in seed_dictionary[subword]]
+        if not seeds and ktup > 1:
+            ktup -= 1
+        else:
+            break
 
-                if subword in seed_dictionary:
-                    seed_list += [(s_index, index, seed_score) for s_index in seed_dictionary[subword]]
-            if not seed_list and ktup_val > 1:
-                ktup_val -= 1
-            else:
-                break
-        return ktup_val, seed_list
+    # if there are NO seeds, then just choose the middle diagonal
+    if not seeds:
+        return banded_SW(alphabet, scoring_matrix, seq_s, seq_t, [(0, 0), (0, 0)])
+
+    diagonals = {}
+    for seed in seeds:
+        difference = seed[1] - seed[0]
+        if difference in diagonals:
+            diagonals[difference].append(seed)
+        else:
+            diagonals[difference] = [seed]
+
+
 
     def extend_diagonal(diagonal_seeds: list) -> tuple:
         # seeds start at length ktup, and begin in the form ((s_start, t_start), score)
@@ -230,13 +232,6 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
             total_score += seed_score
         return total_score, list(extended_seeds)
 
-    ktup, seeds = get_seeds(ktup)
-
-    # if there are NO seeds, then just choose the middle diagonal
-    if not seeds:
-        return banded_SW(alphabet, scoring_matrix, seq_s, seq_t, [(0, 0), (0, 0)])
-
-    diagonals = get_diagonals(seeds)
     diagonal_scores = []
     for diagonal_key in diagonals:
         diagonal_scores.append((extend_diagonal(diagonals[diagonal_key]), diagonal_key))
