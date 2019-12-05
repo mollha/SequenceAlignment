@@ -46,7 +46,8 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         alignment_t = alignment_t[1:]
     return score
 
-def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, width, seed):
+def banded_SW(alphabet, scoring_matrix, seq_s, seq_t, seed):
+    width = 30
     # Set to store all (x, y) coors of valid regions in the grid
     region = set()
     # Iterate up + left add all along diagonal + any width away to set
@@ -233,7 +234,7 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
 
     # if there are NO seeds, then just choose the middle diagonal
     if not seeds:
-        return banded_SW(alphabet, scoring_matrix, seq_s, seq_t, 3, [(0, 0), (0, 0)])
+        return banded_SW(alphabet, scoring_matrix, seq_s, seq_t, [(0, 0), (0, 0)])
 
     diagonals = get_diagonals(seeds)
     diagonal_scores = []
@@ -245,15 +246,10 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
     tuples = [triple[0][1][0] for triple in top_3]
     best_seeds = [[(i_tuple[0], i_tuple[0] + i_tuple[3]), (i_tuple[1], i_tuple[1] + i_tuple[3])] for i_tuple in tuples]
 
-    width = 32
-
-    # --- 2) Run BandedSmithWaterman on each pair using the found average distance between diagonals ---
     max_score = -float('inf')
     best_results = None
     for seed in best_seeds:
-        # print("Running BSW...")
-        results = banded_SW(alphabet, scoring_matrix, seq_s, seq_t, width, seed)
-        # print("Input Seed {0} | Output - {1}".format(seed, results))
+        results = banded_SW(alphabet, scoring_matrix, seq_s, seq_t, seed)
         if results[0] > max_score:
             max_score = results[0]
             best_results = results
