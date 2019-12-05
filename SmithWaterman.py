@@ -76,20 +76,17 @@ def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
 
     seq_s, seq_t = seq_s[shift[0]:len(seq_s) - shift[1]], seq_t[shift[1]:len(seq_t) - shift[0]]
 
-    # initialises cost and backtrack (paths) matrix here
-    values = []
+    values, paths = [], []
     for i in range(len(seq_s) + 1):
         values.append([])
+        paths.append([])
         for j in range(len(seq_t) + 1):
             values[i].append(0)
-    # values = [[0 for _ in range(len(seq_s) + 1)] for _ in range(len(seq_t) + 1)]
-    paths = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
+            if not i and not j:
+                paths[i].append('R')
+            else:
+                paths[i].append('U' if not j else 'L' if not i else 'R')
 
-    paths[0] = ['L' for _ in range(len(paths[0]))]
-    for i in range(len(paths)):
-        paths[i][0] = 'U'
-    # Set 0,0 to None (always terminate here)
-    paths[0][0] = 'R'
     values[0] = [0 for _ in range(len(values[0]))]
 
     for i in range(len(values)):
