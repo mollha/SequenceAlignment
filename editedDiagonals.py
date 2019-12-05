@@ -223,7 +223,7 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tu
 
     # if there are NO seeds, then just choose the middle diagonal
     if not seeds:
-        return banded_smith_waterman(alphabet, scoring_matrix, seq_s, seq_t, 0, band_width)
+        return banded_SW(alphabet, scoring_matrix, seq_s, seq_t, 3, [(0, 0), (0, 0)])
 
     diagonals = get_diagonals(seeds)
     diagonal_scores = []

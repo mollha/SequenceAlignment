@@ -166,6 +166,17 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
     """
     ktup = max(3, math.ceil(min(len(seq_s), len(seq_t)) * 0.015))
 
+    def get_diagonals(seed_list: list) -> dict:
+        seed_diagonals = {}
+        for seed in seed_list:
+            # seeds are of length ktup, and are in the form (s_index, t_index, score)
+            difference = seed[1] - seed[0]    # t_index - s_index
+            if difference in seed_diagonals:
+                seed_diagonals[difference].append(seed)
+            else:
+                seed_diagonals[difference] = [seed]
+        return seed_diagonals
+
     def get_seeds(ktup_val: int) -> tuple:
         while True:
             seed_dictionary = {}
@@ -182,58 +193,62 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
                 seed_score = sum(score_list)
 
                 if subword in seed_dictionary:
-                    seed_list += [[(index, index + ktup), (s_index, s_index + ktup)] for s_index in seed_dictionary[subword]]
+                    seed_list += [(s_index, index, seed_score) for s_index in seed_dictionary[subword]]
             if not seed_list and ktup_val > 1:
                 ktup_val -= 1
             else:
                 break
         return ktup_val, seed_list
 
-    def extend(diagonals):
-        """
-        Given a dict of all seeds along the same diagonal, extend them if they lie upon the
-        same diagonal and return the new start-end indices
-        :param diagonals: dict, output of get_diagonals
-        :return: 2d arr of tuples, [[(start1, end1), (start2, end2)], ...]
-        """
-        # Repeat until no more merges occur
-        while True:
-            # Exit condition -> no more merges have occured
-            flag = True
-            # Loop over every diagonal
-            for diagonal_id in diagonals:
+    def extend_diagonal(diagonal_seeds: list) -> tuple:
+        print(diagonal_seeds)
+        # seeds start at length ktup, and begin in the form ((s_start, t_start), score)
+        # they end as length >= ktup, and are translated to the form ((s_start, t_start), score, length)
+        extended_seeds = set()
+        total_score = 0
+        for seed_tuple in diagonal_seeds:
+            s_start, t_start, seed_score = seed_tuple
+            i, j = s_start - 1, t_start - 1
+            count = 0
 
-                # Get all subsequences that lie on that diagonal
-                seeds = diagonals[diagonal_id]
-                new_seeds = []
-                # If len(seeds) == 1 [no option to merge]
-                if len(seeds) == 1:
-                    new_seeds = seeds
+            # extend from top
+            while i >= 0 and j >= 0:
+                addition = get_score(alphabet, scoring_matrix, seq_s[i], seq_t[j])
+                if addition < 0:
+                    break
                 else:
-                    # Loop over all seeds on the same diagonal
-                    for i in range(len(seeds)-1):
-                        # Get subsequences between seeds & score it
-                        subseq_s, subseq_t = seq_s[seeds[i][0][1]:seeds[i+1][0][0]], \
-                                           seq_t[seeds[i][1][1]:seeds[i+1][1][0]]
-                        score = 0
-                        for j in range(len(subseq_s)):
-                            score += get_score(alphabet, scoring_matrix, subseq_s[j], subseq_t[j])
+                    seed_score += addition
+                    count += 1
+                    i, j = i - 1, j - 1
+            i, j = s_start + ktup, t_start + ktup
+            s_start, t_start = s_start - count, t_start - count
+            length = ktup + count
+            count = 0
+            # extend from bottom
+            while i < len(seq_s) and j < len(seq_t):
+                addition = get_score(alphabet, scoring_matrix, seq_s[i], seq_t[j])
+                if addition < 0:
+                    break
+                else:
+                    seed_score += addition
+                    count += 1
+                    i, j = i + 1, j + 1
+            length += count
 
-                        # If score >= expected value -> merge
-                        s = [(seeds[i][0][0], seeds[i+1][0][1]), (seeds[i][1][0], seeds[i+1][1][1])]
-                        if s not in seeds:
-                            # print("Original {0} | {1}".format(seeds[i], seeds[i+1]))
-                            # print("Merged: {0}".format(s))
-                            new_seeds.append(s)
-                            flag = False
-                # Update seeds to contain merges
-                diagonals[diagonal_id] = new_seeds
+            clone_set = extended_seeds.copy()
 
-            # If no merges have occured -> break
-            if flag:
-                break
-
-        return diagonals
+            # # --- RESOLVE OVERLAP ---
+            for existing_seed in extended_seeds:
+                lower, upper = existing_seed[0], existing_seed[0] + length
+                if (lower <= s_start <= upper) or (lower <= s_start + length <= upper):
+                    # Overlap exists
+                    if existing_seed[2] < seed_score:
+                        total_score -= existing_seed[2]
+                        clone_set.remove(existing_seed)
+            extended_seeds = clone_set
+            extended_seeds.add((s_start, t_start, seed_score, length))
+            total_score += seed_score
+        return total_score, list(extended_seeds)
 
     def get_best(diagonals):
         """
@@ -282,30 +297,21 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
         return best_results
 
     ktup, seeds = get_seeds(ktup)
+
+    # if there are NO seeds, then just choose the middle diagonal
     if not seeds:
-        seeds = [0, [[], [], [], []]]
+        return banded_SW(alphabet, scoring_matrix, seq_s, seq_t, 3, [(0, 0), (0, 0)])
 
+    diagonals = get_diagonals(seeds)
+    diagonal_scores = []
+    for diagonal_key in diagonals:
+        diagonal_scores.append((extend_diagonal(diagonals[diagonal_key]), diagonal_key))
+    print(diagonal_scores)
+    diagonal_scores.sort(key=lambda x: x[0][0], reverse=True)
+    top_3 = diagonal_scores[0: min(3, len(diagonal_scores))]  # get top 3 diagonals
+    tuples = [triple[0][1][0] for triple in top_3]
+    best_seeds = [[(i_tuple[0], i_tuple[0] + i_tuple[3]), (i_tuple[1], i_tuple[1] + i_tuple[3])] for i_tuple in tuples]
 
-    # --- 2) Identify matching diagonals in seeds ---
-    diagonals = {}
-    # Iterate over all seeds
-    for item in seeds:
-        # Get difference in starting index
-        diff = item[0][0] - item[1][0]
-        # Add item to dict s.t. all items w/ same diff in starting index have same key in dict
-        try:
-            diagonals[diff].append(item)
-        except KeyError:
-            diagonals[diff] = [item]
-    # print("Got seeds along same diagonal.")
-
-    # --- 3) Greedily extend words along diagonals if score of subsequence > threshold ---
-    diagonals = extend(diagonals)
-    # print("Seeds extended.")
-
-    # --- 4) Get top n% of seeds ---
-    # Fixed val as otherwise time grows ++ w/ increase in sequence length
-    best_seeds = get_best(diagonals)
 
     # --- 5) Run banded SmithWaterman (with width A) on best seed ---
     return banded_smith_waterman(best_seeds)
