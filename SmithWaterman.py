@@ -18,9 +18,11 @@ def backtrack(paths: list, max_indices: tuple) -> tuple:
     alignment_t.reverse()
     return alignment_s, alignment_t
 
+
 def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
     alpha += '_'
     return scoring[alpha.index(char_s)][alpha.index(char_t)]
+
 
 def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t):
     score = 0
@@ -46,26 +48,28 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
         alignment_t = alignment_t[1:]
     return score
 
-def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
+
+def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
     band_width = 30
-    u, v, x, y = seed[0], seed[1], seed[0] + 1, seed[1] + 1
-    shift = max(0, seed[0] - min(seed[0], seed[1]) - band_width), max(0, seed[1] - min(seed[0], seed[1]) - band_width)
+    u, v, x, y = st_pair[0], st_pair[1], st_pair[0] + 1, st_pair[1] + 1
+    shift = max(0, st_pair[0] - min(st_pair[0], st_pair[1]) - band_width), \
+            max(0, st_pair[1] - min(st_pair[0], st_pair[1]) - band_width)
     cell_set = set()
 
     # ---------------------------- INITIALIZE CELL SET ----------------------------
-    def get_cells(u, v):
+    def get_cells(element1, element2):
         update_cells = set()
         for i in range(-band_width, band_width + 1):
             for j in range(-band_width, band_width + 1):
-                if 0 <= u + i < len(seq_s) and 0 <= v + j < len(seq_t):
-                    update_cells.add((u + i, v + j))
+                if 0 <= element1 + i < len(seq_s) and 0 <= element2 + j < len(seq_t):
+                    update_cells.add((element1 + i, element2 + j))
         return update_cells
 
-    for s_index in range(min(seed)):
+    for s_index in range(min(st_pair)):
         u, v = u - s_index, v - s_index
         cell_set.update(get_cells(u, v))
 
-    for t_index in range(min(len(seq_s) - seed[0] + 1, len(seq_t) - seed[1] + 1)):
+    for t_index in range(min(len(seq_s) - st_pair[0] + 1, len(seq_t) - st_pair[1] + 1)):
         x, y = x + t_index, y + t_index
         cell_set.update(get_cells(u, v))
     # -----------------------------------------------------------------------------
@@ -75,51 +79,45 @@ def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
     # initialises cost and backtrack (paths) matrix here
 
     values = [[0 for _ in range(len(seq_s) + 1)] for _ in range(len(seq_t) + 1)]
-    backtrack_matrix = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
-    backtrack_matrix[0] = ['L' for _ in range(len(backtrack_matrix[0]))]
-    for i in range(len(backtrack_matrix)):
-        backtrack_matrix[i][0] = 'U'
+    paths = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
+    paths[0] = ['L' for _ in range(len(paths[0]))]
+    for i in range(len(paths)):
+        paths[i][0] = 'U'
     # Set 0,0 to None (always terminate here)
-    backtrack_matrix[0][0] = 'R'
+    paths[0][0] = 'R'
     values[0] = [0 for _ in range(len(values[0]))]
 
     for i in range(len(values)):
         values[i][0] = 0
 
-    # Max score tracker
-    max_score = -float('inf')
-    max_index = (0, 0)  # init to 0,0 (0 score)
+    max_index, max_score = (0, 0), float('-inf')
 
     # Iterate over scoring matrix and generate scoring (start at 1,1 and work from there)
     for y in range(1, len(seq_t) + 1):  # y -> seq_t
-        # Break flag -> set true once in banded region, then if out -> can break (as dont need to consider further)
         flag = False
         for x in range(1, len(seq_s) + 1):  # x -> seq_s
             # Check if current scoring cell lies in diagonal
             if (x + shift[0], y + shift[1]) in cell_set:
-                # Set flag (as reached banded region)
                 flag = True
-                # If in diagonal, score as normal (cell not in diagonal all have score = 0)
-                vals = [
-                    # seq_t[y-1], seq_s[x-1] as matrix has empty row & col at start
-                    values[y - 1][x - 1] + get_score(alphabet, scoring_matrix, seq_t[y - 1], seq_s[x - 1]),  # diagonal
-                    values[y - 1][x] + get_score(alphabet, scoring_matrix, seq_t[y - 1], '_'),  # up
-                    values[y][x - 1] + get_score(alphabet, scoring_matrix, '_', seq_s[x - 1]),  # left
-                    0]  # 0 for local alignment
+                diag = values[y - 1][x - 1] + get_score(alpha, scoring, seq_t[y - 1], seq_s[x - 1])
+                up = values[y - 1][x] + get_score(alpha, scoring, seq_t[y - 1], '_')
+                left = values[y][x - 1] + get_score(alpha, scoring, '_', seq_s[x - 1])
+                max_val = max([diag, up, left, 0])
                 # Update scoring matrix
-                values[y][x] = max(vals)
+                values[y][x] = max_val
                 # Get index of max
-                index = vals.index(max(vals))
+                path_val = ['D', 'L', 'U'][[diag, left, up].index(max_val)]
+
                 # Update backtrack matrix if score it come from is a valid cell
-                if index == 0 and (x - 1 + shift[0], y - 1 + shift[1]) in cell_set:
-                    backtrack_matrix[y][x] = 'D'
-                elif index == 1 and (x + shift[0], y - 1 + shift[1]) in cell_set:
-                    backtrack_matrix[y][x] = 'U'
-                elif index == 2 and (x - 1 + shift[0], y + shift[1]) in cell_set:
-                    backtrack_matrix[y][x] = 'L'
+                if path_val == 'D' and (x - 1 + shift[0], y - 1 + shift[1]) in cell_set:
+                    paths[y][x] = 'D'
+                elif path_val == 'U' and (x + shift[0], y - 1 + shift[1]) in cell_set:
+                    paths[y][x] = 'U'
+                elif path_val == 'L' and (x - 1 + shift[0], y + shift[1]) in cell_set:
+                    paths[y][x] = 'L'
                 # Check if new greatest score seen (score for vals outside diagonals score = 0)
-                if max(vals) > max_score:
-                    max_score = max(vals)
+                if max_val > max_score:
+                    max_score = max_val
                     max_index = (y, x)
             else:
                 # If cell doesn't lie in diagonal -> score = 0 (local alignment still)
@@ -127,12 +125,11 @@ def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
                 # If flag = True, have passed over banded region and back into region outside of band -> can break
                 if flag:
                     break
-    alignment_s, alignment_t = backtrack(backtrack_matrix, max_index)
+    alignment_s, alignment_t = backtrack(paths, max_index)
     return max_score, alignment_s, alignment_t
 
 
 def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
-
     ktup = max(3, int(-(-min(len(seq_s), len(seq_t)) // 50)))
 
     while True:
@@ -232,14 +229,15 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
             response = score, alignment_s, alignment_t
     return response
 
+
 if __name__ == "__main__":
     alphabet = "ABCD"
     scoring_matrix = [
-            [ 1,-5,-5,-5,-1],
-            [-5, 1,-5,-5,-1],
-            [-5,-5, 5,-5,-4],
-            [-5,-5,-5, 6,-4],
-            [-1,-1,-4,-4,-9]]
+        [1, -5, -5, -5, -1],
+        [-5, 1, -5, -5, -1],
+        [-5, -5, 5, -5, -4],
+        [-5, -5, -5, 6, -4],
+        [-1, -1, -4, -4, -9]]
     sequence1 = "DDCDDCCCDCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACCCCDDDDDDAAAACADDCDADCDCDCDCD"
     sequence2 = "DDCDDCCCDCBCCCCDDDCDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBDCDCDCDCD"
 
@@ -252,11 +250,10 @@ if __name__ == "__main__":
     print("------------")
 
     # Part 2 - O(n) dynamic prog. (space)
-    score, out2_indices , out1_indices = heuralign(alphabet, scoring_matrix, sequence1, sequence2)
+    score, out2_indices, out1_indices = heuralign(alphabet, scoring_matrix, sequence1, sequence2)
 
     # Output - print results
     print("Score: {0}".format(score))
     print("Indices: {0} | {1}".format(out1_indices, out2_indices))
     score = check_score(alphabet + '_', scoring_matrix, sequence1, sequence2, out1_indices, out2_indices)
     print('CHECKING SCORE: {} \n'.format(score))
-

@@ -92,7 +92,7 @@ def needleman_wunsch(alpha: str, scoring: list, seq_s: str, seq_t: str) -> tuple
                 up = values[i - 1][j] + get_score(alpha, scoring, seq_s[i - 1], '_')
                 left = values[i][j - 1] + get_score(alpha, scoring, '_', seq_t[j - 1])
                 val = max(diag, up, left)
-                path_val = ['D', 'L', 'U', ][[diag, left, up].index(val)]
+                path_val = ['D', 'L', 'U'][[diag, left, up].index(val)]
             values[i].append(val)
             paths[i].append(path_val)
     return backtrack(paths, (len(seq_s), len(seq_t)))
@@ -237,6 +237,11 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> l
 # ---------------------------------------------------------------------------------------------------------------------
 
 # TESTS
+
+string_1 ="BDABCBBDCAABDDCDABACDADDCBCABA"
+string_2 ="CCAABBBDABACADBCCADCADAAACDCCA"
+
+
 
 scoring_matrix = [[ 1,-5,-5,-5,-1],[-5, 1,-5,-5,-1],[-5,-5, 5,-5,-4],[-5,-5,-5, 6,-4],[-1,-1,-4,-4,-9]]
 alphabet = "ABCD"
