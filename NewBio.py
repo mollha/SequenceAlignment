@@ -126,6 +126,7 @@ def hirschberg(alpha: str, scoring: list, seq_s: str, seq_t: str, offset: tuple,
     return alignment_s_half1 + alignment_s_half2, alignment_t_half1 + alignment_t_half2
 
 
+
 # ---------------------------------------------------------------------
 
 

@@ -51,7 +51,8 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
 
 def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
     band_width = 30
-    u, v, x, y = st_pair[0], st_pair[1], st_pair[0] + 1, st_pair[1] + 1
+    best_index, max_score = (0, 0), float('-inf')
+    u, v, x, y_corr = st_pair[0], st_pair[1], st_pair[0] + 1, st_pair[1] + 1
     shift = max(0, st_pair[0] - min(st_pair[0], st_pair[1]) - band_width), \
             max(0, st_pair[1] - min(st_pair[0], st_pair[1]) - band_width)
     cell_set = set()
@@ -70,7 +71,7 @@ def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
         cell_set.update(get_cells(u, v))
 
     for t_index in range(min(len(seq_s) - st_pair[0] + 1, len(seq_t) - st_pair[1] + 1)):
-        x, y = x + t_index, y + t_index
+        x, y_corr = x + t_index, y_corr + t_index
         cell_set.update(get_cells(u, v))
     # -----------------------------------------------------------------------------
 
@@ -87,47 +88,32 @@ def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
             else:
                 paths[i].append('U' if not j else 'L' if not i else 'R')
 
-    values[0] = [0 for _ in range(len(values[0]))]
-
-    for i in range(len(values)):
-        values[i][0] = 0
-
-    max_index, max_score = (0, 0), float('-inf')
-
-    # Iterate over scoring matrix and generate scoring (start at 1,1 and work from there)
-    for y in range(1, len(seq_t) + 1):  # y -> seq_t
-        flag = False
-        for x in range(1, len(seq_s) + 1):  # x -> seq_s
-            # Check if current scoring cell lies in diagonal
-            if (x + shift[0], y + shift[1]) in cell_set:
-                flag = True
-                diag = values[y - 1][x - 1] + get_score(alpha, scoring, seq_t[y - 1], seq_s[x - 1])
-                up = values[y - 1][x] + get_score(alpha, scoring, seq_t[y - 1], '_')
-                left = values[y][x - 1] + get_score(alpha, scoring, '_', seq_s[x - 1])
+    for y in range(len(seq_t)):
+        y_corr, processed = y + 1, 0
+        for x in range(1, len(seq_s) + 1):
+            if (x + shift[0], y_corr + shift[1]) in cell_set:
+                processed += 1
+                # ----------------------------- CALCULATE VALUES -------------------------------------
+                diag = values[y_corr - 1][x - 1] + get_score(alpha, scoring, seq_t[y_corr - 1], seq_s[x - 1])
+                up = values[y_corr - 1][x] + get_score(alpha, scoring, seq_t[y_corr - 1], '_')
+                left = values[y_corr][x - 1] + get_score(alpha, scoring, '_', seq_s[x - 1])
                 max_val = max([diag, up, left, 0])
-                # Update scoring matrix
-                values[y][x] = max_val
-                # Get index of max
+                values[y_corr][x] = max_val
                 path_val = ['D', 'L', 'U', 'R'][[diag, left, up, 0].index(max_val)]
-
-                # Update backtrack matrix if score it come from is a valid cell
-                if path_val == 'D' and (x - 1 + shift[0], y - 1 + shift[1]) in cell_set:
-                    paths[y][x] = 'D'
-                elif path_val == 'U' and (x + shift[0], y - 1 + shift[1]) in cell_set:
-                    paths[y][x] = 'U'
-                elif path_val == 'L' and (x - 1 + shift[0], y + shift[1]) in cell_set:
-                    paths[y][x] = 'L'
-                # Check if new greatest score seen (score for vals outside diagonals score = 0)
-                if max_val > max_score:
+                # -----------------------------------------------------------------------------------
+                tuples = [(x - 1 + shift[0], y_corr - 1 + shift[1]),
+                          (x - 1 + shift[0], y_corr + shift[1]),
+                          (x + shift[0], y_corr - 1 + shift[1])]
+                if path_val != 'R' and tuples[['D', 'L', 'U', 'R'].index(path_val)] in cell_set:
+                    paths[y_corr][x] = path_val
+                if max_score < max_val:
                     max_score = max_val
-                    max_index = (y, x)
+                    best_index = (y_corr, x)
             else:
-                # If cell doesn't lie in diagonal -> score = 0 (local alignment still)
-                values[y][x] = 0
-                # If flag = True, have passed over banded region and back into region outside of band -> can break
-                if flag:
+                values[y_corr][x] = 0
+                if processed:
                     break
-    alignment_s, alignment_t = backtrack(paths, max_index)
+    alignment_s, alignment_t = backtrack(paths, best_index)
     return max_score, alignment_s, alignment_t
 
 
