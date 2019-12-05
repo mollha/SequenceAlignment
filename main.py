@@ -1,27 +1,4 @@
-from random import choice
-import time
-
-# ------------------------ HELPER FUNCTIONS --------------------------
-
-
-# TODO remove this function once checks are complete
-def check_score(alpha: str, scoring: list, seq_s: str, seq_t: str, alignment_s: list, alignment_t: list):
-    score_val = 0
-    for i in range(alignment_s[0], alignment_s[-1]):
-        if i not in alignment_s:
-            score_val += get_score(alpha, scoring, seq_s[i], '_')
-
-    for i in range(alignment_t[0], alignment_t[-1]):
-        if i not in alignment_t:
-            score_val += get_score(alpha, scoring, '_', seq_t[i])
-
-    while alignment_s and alignment_t:
-        score_val += get_score(alpha, scoring, seq_s[alignment_s[0]], seq_t[alignment_t[0]])
-        alignment_s = alignment_s[1:]
-        alignment_t = alignment_t[1:]
-    return score_val
-
-
+# ------------------------ ADDITIONAL FUNCTIONS --------------------------
 def get_score(alpha: str, scoring: list, char_s: str, char_t: str) -> int:
     alpha += '_'
     return scoring[alpha.index(char_s)][alpha.index(char_t)]
@@ -126,11 +103,77 @@ def hirschberg(alpha: str, scoring: list, seq_s: str, seq_t: str, offset: tuple,
     return alignment_s_half1 + alignment_s_half2, alignment_t_half1 + alignment_t_half2
 
 
+def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
+    band_width = 30
+    best_index, max_score = (0, 0), float('-inf')
+    u, v, x, y_corr = st_pair[0], st_pair[1], st_pair[0] + 1, st_pair[1] + 1
+    shift = max(0, st_pair[0] - min(st_pair[0], st_pair[1]) - band_width), \
+            max(0, st_pair[1] - min(st_pair[0], st_pair[1]) - band_width)
+    cell_set = set()
 
-# ---------------------------------------------------------------------
+    # ---------------------------- INITIALIZE CELL SET ----------------------------
+    def get_cells(element1, element2):
+        update_cells = set()
+        for i in range(-band_width, band_width + 1):
+            for j in range(-band_width, band_width + 1):
+                if 0 <= element1 + i < len(seq_s) and 0 <= element2 + j < len(seq_t):
+                    update_cells.add((element1 + i, element2 + j))
+        return update_cells
+
+    for s_index in range(min(st_pair)):
+        u, v = u - s_index, v - s_index
+        cell_set.update(get_cells(u, v))
+
+    for t_index in range(min(len(seq_s) - st_pair[0] + 1, len(seq_t) - st_pair[1] + 1)):
+        x, y_corr = x + t_index, y_corr + t_index
+        cell_set.update(get_cells(u, v))
+    # -----------------------------------------------------------------------------
+
+    seq_s, seq_t = seq_s[shift[0]:len(seq_s) - shift[1]], seq_t[shift[1]:len(seq_t) - shift[0]]
+
+    values = [[0 for _ in range(len(seq_s) + 1)] for _ in range(len(seq_t) + 1)]
+    paths = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
+
+    values[0][0] = 0
+    for i in range(len(seq_s)):
+        values[0][i + 1] = max(0, values[0][i] + get_score(alpha, scoring, seq_s[i], '_'))
+
+    for i in range(len(seq_t)):
+        values[i + 1][0] = max(0, values[i][0] + get_score(alpha, scoring, seq_t[i], '_'))
+
+    for y in range(len(seq_t)):
+        y_corr, processed = y + 1, 0
+        for x in range(1, len(seq_s) + 1):
+            if (x + shift[0], y_corr + shift[1]) in cell_set:
+                processed += 1
+                # ----------------------------- CALCULATE VALUES -------------------------------------
+                diag = values[y_corr - 1][x - 1] + get_score(alpha, scoring, seq_t[y_corr - 1], seq_s[x - 1])
+                up = values[y_corr - 1][x] + get_score(alpha, scoring, seq_t[y_corr - 1], '_')
+                left = values[y_corr][x - 1] + get_score(alpha, scoring, '_', seq_s[x - 1])
+                max_val = max([diag, up, left, 0])
+                values[y_corr][x] = max_val
+                path_val = ['D', 'L', 'U', 'R'][[diag, left, up, 0].index(max_val)]
+                # -----------------------------------------------------------------------------------
+                tuples = [(x - 1 + shift[0], y_corr - 1 + shift[1]),
+                          (x - 1 + shift[0], y_corr + shift[1]),
+                          (x + shift[0], y_corr - 1 + shift[1])]
+                if path_val != 'R' and tuples[['D', 'L', 'U', 'R'].index(path_val)] in cell_set:
+                    paths[y_corr][x] = path_val
+                if max_score < max_val:
+                    max_score = max_val
+                    best_index = (y_corr, x)
+            else:
+                values[y_corr][x] = 0
+                if processed:
+                    break
+    alignment_t, alignment_s = backtrack(paths, best_index)
+    return max_score, alignment_s, alignment_t
 
 
-def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
+# --------------------------------------------------------------------------------------------------------------------
+
+
+def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tuple:
     high_score = -float('inf')
     max_indices = None
 
@@ -178,10 +221,10 @@ def dynprog(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
                 max_indices = (i, j)
 
     alignment_s, alignment_t = backtrack(paths, max_indices)
-    return [high_score, alignment_s, alignment_t]
+    return high_score, alignment_s, alignment_t
 
 
-def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> list:
+def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tuple:
 
     def scan_matrix(seq_1, seq_2):
         col1, col2 = [], []
@@ -229,45 +272,105 @@ def dynproglin(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> l
     t_add -= j_index        # s_add describes the value to add to indices of sequence t based on what has been removed
 
     alignment_s, alignment_t = hirschberg(alphabet, scoring_matrix, seq_s, seq_t, (s_add, t_add))
-    return [high_score, alignment_s, alignment_t]
+    return (high_score, alignment_s, alignment_t)
 
 
+def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str) -> tuple:
+    ktup = max(3, int(-(-min(len(seq_s), len(seq_t)) // 50)))
 
+    while True:
+        seed_dictionary = {}
+        seeds = []
+        for index in range(len(seq_s) - ktup + 1):
+            subword = seq_s[index: index + ktup]
+            if subword in seed_dictionary:
+                seed_dictionary[subword].append(index)
+            else:
+                seed_dictionary[subword] = [index]
+        for index in range(len(seq_s) - ktup + 1):
+            subword = seq_t[index: index + ktup]
+            score_list = [get_score(alphabet, scoring_matrix, char, char) for char in subword]
+            seed_score = sum(score_list)
 
+            if subword in seed_dictionary:
+                seeds += [(s_index, index, seed_score) for s_index in seed_dictionary[subword]]
+        if not seeds and ktup > 1:
+            ktup -= 1
+        else:
+            break
 
-# ---------------------------------------------------------------------------------------------------------------------
+    # if there are NO seeds, then just choose the middle diagonal
+    if not seeds:
+        return banded_sw(alphabet, scoring_matrix, seq_s, seq_t, (0, 0))
 
-# TESTS
+    diagonals = {}
+    for seed in seeds:
+        difference = seed[1] - seed[0]
+        if difference in diagonals:
+            diagonals[difference].append(seed)
+        else:
+            diagonals[difference] = [seed]
 
-string_1 ="BDABCBBDCAABDDCDABACDADDCBCABA"
-string_2 ="CCAABBBDABACADBCCADCADAAACDCCA"
+    def extend_diagonal(diagonal_seeds: list) -> tuple:
+        extended_seeds = set()
+        total_score = 0
+        for seed_tuple in diagonal_seeds:
+            s_start, t_start, seed_score = seed_tuple
+            i, j = s_start - 1, t_start - 1
+            count = 0
 
+            # extend from top
+            while i >= 0 and j >= 0:
+                addition = get_score(alphabet, scoring_matrix, seq_s[i], seq_t[j])
+                if addition < 0:
+                    break
+                else:
+                    seed_score += addition
+                    count += 1
+                    i, j = i - 1, j - 1
+            i, j = s_start + ktup, t_start + ktup
+            s_start, t_start = s_start - count, t_start - count
+            length = ktup + count
+            count = 0
+            # extend from bottom
+            while i < len(seq_s) and j < len(seq_t):
+                addition = get_score(alphabet, scoring_matrix, seq_s[i], seq_t[j])
+                if addition < 0:
+                    break
+                else:
+                    seed_score += addition
+                    count += 1
+                    i, j = i + 1, j + 1
+            length += count
 
+            clone_set = extended_seeds.copy()
 
-scoring_matrix = [[ 1,-5,-5,-5,-1],[-5, 1,-5,-5,-1],[-5,-5, 5,-5,-4],[-5,-5,-5, 6,-4],[-1,-1,-4,-4,-9]]
-alphabet = "ABCD"
+            # # --- RESOLVE OVERLAP ---
+            for existing_seed in extended_seeds:
+                lower, upper = existing_seed[0], existing_seed[0] + length
+                if (lower <= s_start <= upper) or (lower <= s_start + length <= upper):
+                    # overlap exists
+                    if existing_seed[2] < seed_score:
+                        total_score -= existing_seed[2]
+                        clone_set.remove(existing_seed)
+            extended_seeds = clone_set
+            extended_seeds.add((s_start, t_start, seed_score, length))
+            total_score += seed_score
+        return total_score, list(extended_seeds)
 
-x = 500
-string_1 = "".join(choice(list(alphabet)) for i in range(x))
-string_2 = "".join(choice(list(alphabet)) for i in range(x))
+    diagonal_scores = []
+    for diagonal_key in diagonals:
+        diagonal_scores.append((extend_diagonal(diagonals[diagonal_key]), diagonal_key))
+    diagonal_scores.sort(key=lambda x: x[0][0], reverse=True)
+    top_3 = diagonal_scores[0: min(3, len(diagonal_scores))]  # get top 3 diagonals
+    tuples = [triple[0][1][0] for triple in top_3]
+    best_seeds = [(seed_tuple[0], seed_tuple[1]) for seed_tuple in tuples]
 
-stamp1 = time.time()
-a = dynprog (alphabet, scoring_matrix, string_1, string_2)
-print("Score:   ", a[0])
-print("Indices: ", a[1],a[2])
-score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
-print('CHECKING SCORE: {} \n'.format(score))
-recent_score = score
-stamp2 = time.time()
-print('Seconds for 1st', stamp2-stamp1)
-
-a = dynproglin (alphabet, scoring_matrix, string_1, string_2)
-print("Score:   ", a[0])
-print("Indices: ", a[1],a[2])
-score = check_score(alphabet + '_', scoring_matrix, string_1, string_2, a[1],a[2])
-print('CHECKING SCORE: {} \n'.format(score))
-if score != recent_score:
-    print(string_1 + ' and ' + string_2 + ' do not have matching alignments...')
-stamp3 = time.time()
-print('Seconds for 1st', stamp3-stamp2)
-
+    max_score = -float('inf')
+    response = None
+    for seed in best_seeds:
+        score, alignment_s, alignment_t = banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed)
+        if max_score < score:
+            max_score = score
+            response = score, alignment_s, alignment_t
+    return response

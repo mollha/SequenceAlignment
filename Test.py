@@ -1,3 +1,5 @@
+from random import choice
+
 def backtrack(paths: list, max_indices: tuple) -> tuple:
     i, j = max_indices
     alignment_s, alignment_t = [], []
@@ -77,16 +79,15 @@ def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
 
     seq_s, seq_t = seq_s[shift[0]:len(seq_s) - shift[1]], seq_t[shift[1]:len(seq_t) - shift[0]]
 
-    values, paths = [], []
-    for i in range(len(seq_s) + 1):
-        values.append([])
-        paths.append([])
-        for j in range(len(seq_t) + 1):
-            values[i].append(0)
-            if not i and not j:
-                paths[i].append('R')
-            else:
-                paths[i].append('U' if not j else 'L' if not i else 'R')
+    values = [[0 for _ in range(len(seq_s) + 1)] for _ in range(len(seq_t) + 1)]
+    paths = [['R' for _ in range(len(values[0]))] for _ in range(len(values))]
+
+    values[0][0] = 0
+    for i in range(len(seq_s)):
+        values[0][i + 1] = max(0, values[0][i] + get_score(alphabet, scoring_matrix, seq_s[i], '_'))
+
+    for i in range(len(seq_t)):
+        values[i + 1][0] = max(0, values[i][0] + get_score(alphabet, scoring_matrix, seq_t[i], '_'))
 
     for y in range(len(seq_t)):
         y_corr, processed = y + 1, 0
@@ -113,7 +114,7 @@ def banded_sw(alpha, scoring, seq_s, seq_t, st_pair):
                 values[y_corr][x] = 0
                 if processed:
                     break
-    alignment_s, alignment_t = backtrack(paths, best_index)
+    alignment_t, alignment_s = backtrack(paths, best_index)
     return max_score, alignment_s, alignment_t
 
 
@@ -219,29 +220,59 @@ def heuralign(alphabet: str, scoring_matrix: list, seq_s: str, seq_t: str):
 
 
 if __name__ == "__main__":
+    # # Debug input 1
+    # alphabet = "ABC"
+    # scoring_matrix = [[1, -1, -2, -1], [-1, 2, -4, -1], [-2, -4, 3, -2], [-1, -1, -2, 0]]
+    # sequence1 = "AABBAACA"
+    # sequence2 = "CBACCCBA"
+    # # Debug input 2
+    # alphabet = "ABCD"
+    # scoring_matrix = [
+    #         [ 1,-5,-5,-5,-1],
+    #         [-5, 1,-5,-5,-1],
+    #         [-5,-5, 5,-5,-4],
+    #         [-5,-5,-5, 6,-4],
+    #         [-1,-1,-4,-4,-9]]
+    # sequence1 = "AAAAACCDDCCDDAAAAACC"
+    # sequence2 = "CCAAADDAAAACCAAADDCCAAAA"
+    # # Debug input 3
+    # alphabet = "ABCD"
+    # scoring_matrix = [
+    #         [ 1,-5,-5,-5,-1],
+    #         [-5, 1,-5,-5,-1],
+    #         [-5,-5, 5,-5,-4],
+    #         [-5,-5,-5, 6,-4],
+    #         [-1,-1,-4,-4,-9]]
+    # sequence1 = "AACAAADAAAACAADAADAAA"
+    # sequence2 = "CDCDDD"
+    # Debug input 4
     alphabet = "ABCD"
     scoring_matrix = [
-        [1, -5, -5, -5, -1],
-        [-5, 1, -5, -5, -1],
+        [1, 1, -5, -5, -1],
+        [1, 1, -5, -5, -1],
         [-5, -5, 5, -5, -4],
         [-5, -5, -5, 6, -4],
         [-1, -1, -4, -4, -9]]
-    sequence1 = "DDCDDCCCDCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACCCCDDDDDDAAAACADDCDADCDCDCDCD"
-    sequence2 = "DDCDDCCCDCBCCCCDDDCDBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBDCDCDCDCD"
+    x = 100
+    sequence1 = "".join(choice(list(alphabet)) for i in range(45))
+    sequence2 = "".join(choice(list(alphabet)) for i in range(x))
 
-    # TODO check what happens when no matches
 
+    print("Starting:")
     # Strip to ensure no whitespace
     sequence1, sequence2 = sequence1.strip(), sequence2.strip()
     print("Seq 1 - {0} ".format(sequence1))
     print("Seq 2 - {0}".format(sequence2))
     print("------------")
 
-    # Part 2 - O(n) dynamic prog. (space)
-    score, out2_indices, out1_indices = heuralign(alphabet, scoring_matrix, sequence1, sequence2)
+    # TODO: improve runtime of scoring by using dicts!
+
+    #  Part 3 - < O(n^2) heuristic procedure, similar to FASTA and BLAST (time)
+    score, out1_indices, out2_indices = heuralign(alphabet, scoring_matrix, sequence1, sequence2)
 
     # Output - print results
+    print("------------")
     print("Score: {0}".format(score))
-    print("Indices: {0} | {1}".format(out1_indices, out2_indices))
+    print("Indices: {0} {1}".format(out1_indices, out2_indices))
     score = check_score(alphabet + '_', scoring_matrix, sequence1, sequence2, out1_indices, out2_indices)
     print('CHECKING SCORE: {} \n'.format(score))
