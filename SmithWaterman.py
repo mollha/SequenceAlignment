@@ -164,24 +164,30 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
     :param seq_t: sequence of chars, str
     :return: 2 arr's of each chars alignment
     """
-    word_length = max(3, math.ceil(min(len(seq_s), len(seq_t)) * 0.015))
+    ktup = max(3, math.ceil(min(len(seq_s), len(seq_t)) * 0.015))
 
-    def get_threshold():
-        """
-        Iterate over scoring matrix and determine the threshold value
-        :return: int, threshold hold value
-        """
-        # Calculate weighted average according to symbol count within the sequences
-        char_freq = {i: (seq_s+seq_t).count(i)/len(seq_s+seq_t) for i in alphabet}
+    def get_seeds(ktup_val: int) -> tuple:
+        while True:
+            seed_dictionary = {}
+            seed_list = []
+            for index in range(len(seq_s) - ktup_val + 1):
+                subword = seq_s[index: index + ktup_val]
+                if subword in seed_dictionary:
+                    seed_dictionary[subword].append(index)
+                else:
+                    seed_dictionary[subword] = [index]
+            for index in range(len(seq_s) - ktup_val + 1):
+                subword = seq_t[index: index + ktup_val]
+                score_list = [get_score(alphabet, scoring_matrix, char, char) for char in subword]
+                seed_score = sum(score_list)
 
-        # For all pairs, get scores and weight by char_freq
-        pairs = [[i, j] for i in alphabet for j in alphabet]
-        pair_weights = [char_freq[x]+char_freq[y] for x, y in pairs]
-
-        # Expected score
-        threshold = np.average([get_score(alphabet, scoring_matrix, x[0], x[1]) for x in pairs], weights=pair_weights)
-
-        return threshold
+                if subword in seed_dictionary:
+                    seed_list += [[(index, index + ktup), (s_index, s_index + ktup)] for s_index in seed_dictionary[subword]]
+            if not seed_list and ktup_val > 1:
+                ktup_val -= 1
+            else:
+                break
+        return ktup_val, seed_list
 
     def extend(diagonals):
         """
@@ -190,15 +196,10 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
         :param diagonals: dict, output of get_diagonals
         :return: 2d arr of tuples, [[(start1, end1), (start2, end2)], ...]
         """
-
-        # Calculate the expected score of any given string
-        threshold = get_threshold()
-
         # Repeat until no more merges occur
         while True:
             # Exit condition -> no more merges have occured
             flag = True
-
             # Loop over every diagonal
             for diagonal_id in diagonals:
 
@@ -219,18 +220,12 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
                             score += get_score(alphabet, scoring_matrix, subseq_s[j], subseq_t[j])
 
                         # If score >= expected value -> merge
-                        if score >= threshold:
-                            s = [(seeds[i][0][0], seeds[i+1][0][1]), (seeds[i][1][0], seeds[i+1][1][1])]
-                            if s not in seeds:
-                                # print("Original {0} | {1}".format(seeds[i], seeds[i+1]))
-                                # print("Merged: {0}".format(s))
-                                new_seeds.append(s)
-                                flag = False
-                        else:
-                            new_seeds.append(seeds[i])
-                            if i == len(seeds)-2:  # Add final seed into pool even if dont match
-                                new_seeds.append(seeds[i+1])
-
+                        s = [(seeds[i][0][0], seeds[i+1][0][1]), (seeds[i][1][0], seeds[i+1][1][1])]
+                        if s not in seeds:
+                            # print("Original {0} | {1}".format(seeds[i], seeds[i+1]))
+                            # print("Merged: {0}".format(s))
+                            new_seeds.append(s)
+                            flag = False
                 # Update seeds to contain merges
                 diagonals[diagonal_id] = new_seeds
 
@@ -286,26 +281,10 @@ def heuralign(alphabet, scoring_matrix, seq_s, seq_t):
                 best_results = results
         return best_results
 
+    ktup, seeds = get_seeds(ktup)
+    if not seeds:
+        seeds = [0, [[], [], [], []]]
 
-    # --- 1) Seed sequences - find word sequences the sequences have in common ---
-    seeds = []
-    while not seeds:
-        seeds = []
-        # Get all words of length word_length and check if present in seq2
-        for i in range(0, len(seq_s) - word_length + 1):
-            # Get substring of word length
-            word = seq_s[i:i + word_length]
-            # Get start & end indexes of matches
-            matches = [(m.start(0), m.end(0)) for m in re.finditer(word, seq_t)]
-            if matches:
-                for match in matches:
-                    # Store in format (seq1 - start, end), (seq2 - start, end)
-                    seeds.append([(i, i + word_length), match])
-        if not seeds:
-            word_length -= 1
-            if not word_length:
-                print("Sequences contain NO matching characters! Cannot seed!")
-                return [0, [[], [], [], []]]
 
     # --- 2) Identify matching diagonals in seeds ---
     diagonals = {}
