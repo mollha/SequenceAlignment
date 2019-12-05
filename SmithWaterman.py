@@ -47,38 +47,33 @@ def check_score(alphabet, scoring_matrix, seq_s, seq_t, alignment_s, alignment_t
     return score
 
 def banded_sw(alphabet, scoring_matrix, seq_s, seq_t, seed):
+    band_width = 30
+    u, v, x, y = seed[0], seed[1], seed[0] + 1, seed[1] + 1
+    cell_set = set()
 
     def get_cells(u, v):
         update_cells = set()
-        for i in range(-width, width + 1):
-            for j in range(-width, width + 1):
+        for i in range(-band_width, band_width + 1):
+            for j in range(-band_width, band_width + 1):
                 if 0 <= u + i < len(seq_s) and 0 <= v + j < len(seq_t):
                     update_cells.add((u + i, v + j))
         return update_cells
 
-    width = 30
-    u, v = seed
-    cell_set = set()
-    while True:
-        if v < 0 or u < 0:
-            break
+    for s_index in range(min(seed)):
+        u, v = u - s_index, v - s_index
         cell_set.update(get_cells(u, v))
-        u, v = u - 1, v - 1
 
-    u, v = seed[0] + 1, seed[1] + 1
-    while True:
-        if u >= len(seq_s) or v >= len(seq_t):
-            break
+    for t_index in range(min(len(seq_s) - seed[0] + 1, len(seq_t) - seed[1] + 1)):
+        x, y = x + s_index, y + s_index
         cell_set.update(get_cells(u, v))
-        u, v = u + 1, v + 1
 
     # region has been created
     x, y = seed
     x_intercept, y_intercept = x - min(x, y), y - min(x, y)
-    # Banded region is width space away from cells on diagonal in dirs: left, right, up, down (that exist)
+    # Banded region is band_width space away from cells on diagonal in dirs: left, right, up, down (that exist)
     # Get starts of seq_s & seq_t (leftmost cell and topmost cell)
-    seq_s_start = max(0, x_intercept - width)
-    seq_t_start = max(0, y_intercept - width)
+    seq_s_start = max(0, x_intercept - band_width)
+    seq_t_start = max(0, y_intercept - band_width)
     # Get ends of seq_s & seq_t (rightmost and bottommost cell)
     seq_s_end = len(seq_s) - seq_t_start
     seq_t_end = len(seq_t) - seq_s_start
